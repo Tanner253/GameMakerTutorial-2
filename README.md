@@ -11,9 +11,8 @@
 ## Project Overview
 This is a Unity-based game development project that includes a Cookie Clicker game implementation and a custom MCP (Master Control Program) server integration.
 
-<div align="center">
-  <img src="https://raw.githubusercontent.com/Tanner253/GameMakerTutorial-2/main/documentation/proof.jpg" alt="Project Documentation" width="800"/>
-</div>
+![Project Documentation](./documentation/proof.jpg#gh-dark-mode-only)
+![Project Documentation](./documentation/proof.jpg#gh-light-mode-only)
 
 ## Project Structure
 - `Assets/` - Contains all Unity project assets including scripts, scenes, and resources
@@ -87,9 +86,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Additional Documentation
 For more detailed information about the project, please refer to the documentation folder.
 
-<div align="center">
-  <img src="https://raw.githubusercontent.com/Tanner253/GameMakerTutorial-2/main/documentation/prompt.jpg" alt="Project Prompt" width="800"/>
-</div>
+![Project Prompt](./documentation/prompt.jpg#gh-dark-mode-only)
+![Project Prompt](./documentation/prompt.jpg#gh-light-mode-only)
 
 ## Stats
 ![GitHub Stats](https://github-readme-stats.vercel.app/api?username=Tanner253&show_icons=true&theme=radical) 
