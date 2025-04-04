@@ -1,9 +1,19 @@
 # GameMakerTutorial-2
 
+[![MCP](https://img.shields.io/badge/MCP-Active-brightgreen)](https://github.com/Tanner253/GameMakerTutorial-2)
+[![Unity](https://img.shields.io/badge/Unity-2022.3+-blue.svg)](https://unity.com)
+[![Node.js](https://img.shields.io/badge/Node.js-Active-green.svg)](https://nodejs.org)
+[![Stars](https://img.shields.io/github/stars/Tanner253/GameMakerTutorial-2)](https://github.com/Tanner253/GameMakerTutorial-2/stargazers)
+[![Forks](https://img.shields.io/github/forks/Tanner253/GameMakerTutorial-2)](https://github.com/Tanner253/GameMakerTutorial-2/network/members)
+[![MIT License](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT)
+[![Last Commit](https://img.shields.io/github/last-commit/Tanner253/GameMakerTutorial-2)](https://github.com/Tanner253/GameMakerTutorial-2/commits/main)
+
 ## Project Overview
 This is a Unity-based game development project that includes a Cookie Clicker game implementation and a custom MCP (Master Control Program) server integration.
 
-![Project Documentation](documentation/proof.jpg)
+<div align="center">
+  <img src="https://raw.githubusercontent.com/Tanner253/GameMakerTutorial-2/main/documentation/proof.jpg" alt="Project Documentation" width="800"/>
+</div>
 
 ## Project Structure
 - `Assets/` - Contains all Unity project assets including scripts, scenes, and resources
@@ -12,9 +22,10 @@ This is a Unity-based game development project that includes a Cookie Clicker ga
 - `documentation/` - Project documentation and reference images
 
 ## Prerequisites
-- Unity (Latest LTS Version)
-- .NET SDK
+- Unity 2022.3 LTS or higher
+- .NET SDK 6.0+
 - Git
+- Node.js (for MCP server)
 
 ## Getting Started
 
@@ -37,7 +48,19 @@ git clone https://github.com/Tanner253/GameMakerTutorial-2.git
 ## Features
 - Cookie Clicker game mechanics
 - Custom MCP server integration
-- [Additional features to be documented]
+- Real-time multiplayer support
+- Server-side game state management
+- Cross-platform compatibility
+
+## Development Roadmap
+- [ ] Implement basic cookie clicking mechanics
+- [ ] Add upgrade system
+- [ ] Integrate MCP server functionality
+- [ ] Add multiplayer support
+- [ ] Implement save/load system
+- [ ] Add achievements system
+- [ ] Create user authentication
+- [ ] Add leaderboards
 
 ## Development
 This project follows Unity development best practices:
@@ -54,13 +77,19 @@ This project follows Unity development best practices:
 5. Open a Pull Request
 
 ## License
-[License information to be added]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Contact
 - Developer: Tanner253
 - GitHub: [@Tanner253](https://github.com/Tanner253)
+- Project Link: [https://github.com/Tanner253/GameMakerTutorial-2](https://github.com/Tanner253/GameMakerTutorial-2)
 
 ## Additional Documentation
 For more detailed information about the project, please refer to the documentation folder.
 
-![Project Prompt](documentation/prompt.jpg) 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/Tanner253/GameMakerTutorial-2/main/documentation/prompt.jpg" alt="Project Prompt" width="800"/>
+</div>
+
+## Stats
+![GitHub Stats](https://github-readme-stats.vercel.app/api?username=Tanner253&show_icons=true&theme=radical) 
