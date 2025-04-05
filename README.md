@@ -9,7 +9,7 @@
 [![Last Commit](https://img.shields.io/github/last-commit/Tanner253/GameMakerTutorial-2)](https://github.com/Tanner253/GameMakerTutorial-2/commits/main)
 
 ## Project Overview
-This is a Unity-based game development project that includes a Cookie Clicker game implementation and a custom MCP (Master Control Program) server integration.
+This is a Unity-based game development project that includes a Cookie Clicker game implementation
 
 ![Project Documentation](./documentation/proof.jpg#gh-dark-mode-only)
 ![Project Documentation](./documentation/proof.jpg#gh-light-mode-only)
