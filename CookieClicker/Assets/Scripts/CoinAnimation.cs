@@ -4,20 +4,22 @@ public class CoinAnimation : MonoBehaviour
 {
     private SpriteRenderer spriteRenderer;
     private Animator animator;
-    [SerializeField] private Sprite defaultSprite;
+
+    [SerializeField]
+    private Sprite defaultSprite;
     private RuntimeAnimatorController animatorController;
 
     void Awake()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
         animator = GetComponent<Animator>();
-        
+
         // Store references
         if (animator != null)
         {
             animatorController = animator.runtimeAnimatorController;
         }
-        
+
         // Store the default sprite if not already set
         if (defaultSprite == null && spriteRenderer != null)
         {
@@ -55,9 +57,9 @@ public class CoinAnimation : MonoBehaviour
                 animator.runtimeAnimatorController = animatorController;
             }
             animator.enabled = true;
-            
+
             // Force the animation to play
             animator.Play("Coin", 0, 0f);
         }
     }
-} 
+}

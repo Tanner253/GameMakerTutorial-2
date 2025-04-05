@@ -1,133 +1,104 @@
-using UnityEngine;
-using TMPro;
-using UnityEngine.UI;
-using UnityEngine.EventSystems;
 using System.Collections; // Needed for Coroutines
+using TMPro;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 public class ButtonCounter : MonoBehaviour, IPointerClickHandler
 {
-    private int count = 0;
+    // References for UI and Animation
     public TextMeshProUGUI counterText;
-    public Button clickButton;
+    public Button clickButton; // Optional: Can be removed if IPointerClickHandler is sufficient
     public Animator coinAnimator;
+    
+    private RectTransform rectTransform; // Store RectTransform for position
 
-    [Header("Floating Text Settings")]
-    public GameObject floatingTextPrefab; // Assign your TextMeshPro prefab here
-    public Transform textSpawnParent;     // Assign the Canvas Transform here
-    public Vector3 textSpawnOffset = new Vector3(0, 75, 0); // Offset from the coin
-    public float floatDuration = 0.75f; // How long the text floats (seconds)
-    public float floatSpeed = 100f;    // How fast the text floats up
-
-    void Start()
+    void Awake()
     {
-        // Initialize the counter text
-        UpdateCounterText();
-        
-        // Add click listener to the button
-        if (clickButton != null)
+        rectTransform = GetComponent<RectTransform>();
+        if (rectTransform == null)
         {
-            clickButton.onClick.AddListener(IncrementCounter);
+            Debug.LogError("ButtonCounter requires a RectTransform component!", this);
         }
     }
 
-    public void OnPointerClick(PointerEventData eventData)
+    void Start()
     {
-        IncrementCounter();
+        // Register for score updates from GameManager
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnScoreChanged += UpdateCounterText;
+            // Update text with initial score
+            UpdateCounterText(GameManager.Instance.GetCurrentScore()); 
+        }
+        else
+        {
+            Debug.LogError("GameManager not found! ButtonCounter cannot register for score updates.");
+        }
+
+        // Optional: Add click listener to the button component
+        // Can be removed if direct IPointerClickHandler on the coin is preferred
+        if (clickButton != null)
+        {
+            clickButton.onClick.AddListener(HandleClick);
+        }
     }
 
-    void IncrementCounter()
+    void OnDestroy()
     {
-        count++;
-        UpdateCounterText();
-        Debug.Log($"Count increased to: {count}");
+        // Unregister from GameManager event when this object is destroyed
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnScoreChanged -= UpdateCounterText;
+        }
+    }
 
-        // Trigger the animation ONLY if the animator is currently in the Idle state
+    // Called by Unity's Event System when the GameObject is clicked
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        HandleClick();
+    }
+
+    // Centralized click handling logic
+    void HandleClick()
+    {
+        // Tell GameManager to process the click, providing our position
+        if (GameManager.Instance != null && rectTransform != null)
+        {
+            GameManager.Instance.ProcessClick(rectTransform.anchoredPosition);
+        }
+        else
+        {
+             Debug.LogError("Cannot process click: GameManager instance or RectTransform is missing.");
+             return; // Don't proceed if we can't notify GameManager
+        }
+
+        // Trigger the coin's visual animation (remains local responsibility)
         if (coinAnimator != null)
         {
-            // Get the current state information for the base layer (layer 0)
             AnimatorStateInfo stateInfo = coinAnimator.GetCurrentAnimatorStateInfo(0);
-            
-            // Check if the current state's name is "Idle"
-            if (stateInfo.IsName("Idle"))
+            if (stateInfo.IsName("Idle")) // Check if idle before triggering
             {
-                 coinAnimator.SetTrigger("Spin");
+                coinAnimator.SetTrigger("Spin");
             }
         }
         else
         {
-            Debug.LogWarning("Coin Animator is not assigned in the Button Counter script in the Inspector!");
-        }
-        
-        // Show floating text feedback
-        ShowFloatingText();
-    }
-
-    void ShowFloatingText()
-    {
-        if (floatingTextPrefab == null || textSpawnParent == null)
-        {
-            Debug.LogWarning("Floating Text Prefab or Text Spawn Parent not assigned in ButtonCounter!");
-            return;
-        }
-
-        // Instantiate the prefab under the specified parent
-        GameObject textInstance = Instantiate(floatingTextPrefab, textSpawnParent);
-        
-        // Set initial position relative to the coin + offset
-        // Note: For UI elements, setting position directly might need adjustment based on Canvas settings.
-        // Setting anchoredPosition might be more reliable if anchors aren't centered.
-        // Let's start with world position assuming the coin's pivot is reasonable.
-        textInstance.transform.position = transform.position + textSpawnOffset;
-
-        // Get the TextMeshPro component
-        TextMeshProUGUI textMesh = textInstance.GetComponentInChildren<TextMeshProUGUI>();
-        if (textMesh != null)
-        {
-            textMesh.text = "+1"; // Set the text
-            // Start the animation coroutine
-            StartCoroutine(FloatAndFadeText(textInstance, textMesh));
-        }
-        else
-        {
-             Debug.LogError("Floating Text Prefab needs a TextMeshProUGUI component!");
-             Destroy(textInstance); // Clean up useless instance
+            Debug.LogWarning("Coin Animator not assigned in ButtonCounter!", this);
         }
     }
 
-    IEnumerator FloatAndFadeText(GameObject instance, TextMeshProUGUI textMesh)
-    {
-        Color startColor = textMesh.color;
-        float timer = 0f;
-
-        while (timer < floatDuration)
-        {
-            if (instance == null) yield break; // Stop if object was destroyed early
-
-            // Move up
-            instance.transform.position += Vector3.up * floatSpeed * Time.deltaTime;
-
-            // Fade out (calculate alpha based on remaining time)
-            float alpha = Mathf.Lerp(1f, 0f, timer / floatDuration);
-            textMesh.color = new Color(startColor.r, startColor.g, startColor.b, alpha);
-            
-            timer += Time.deltaTime;
-            yield return null; // Wait for the next frame
-        }
-
-        // Ensure it's fully destroyed after the loop
-        if(instance != null) Destroy(instance); 
-    }
-
-    void UpdateCounterText()
+    // Accept decimal score and format
+    void UpdateCounterText(decimal newScore)
     {
         if (counterText != null)
         {
-            counterText.text = $"count: {count}";
-            Debug.Log($"Updated text to: {counterText.text}");
+            // Format the decimal score to display with one decimal place
+            counterText.text = $"count: {newScore:F1}";
         }
         else
         {
-            Debug.LogWarning("CounterText is null!");
+            Debug.LogWarning("CounterText is not assigned in ButtonCounter!", this);
         }
     }
-} 
+}
