@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 using System;
+// Add using for TextMeshPro if you were to add a direct reference here
 
 /// <summary>
 /// Manages all PRODUCTION related upgrades.
@@ -24,6 +25,11 @@ public class ProductionManager : MonoBehaviour
     /// Passes the updated UpgradeState.
     /// </summary>
     public event Action<UpgradeState> OnProductionUpgradeStateChanged;
+
+    /// <summary>
+    /// Fired when the calculated total production rate per second changes.
+    /// </summary>
+    public event Action<decimal> OnTotalProductionRateChanged;
 
     void Awake()
     {
@@ -74,10 +80,10 @@ public class ProductionManager : MonoBehaviour
                     decimal productionPerTick = (decimal)prodData.baseProductionAmount * upgradeState.level;
                     scoreGeneratedThisTick = productionPerTick * ticksOccurred;
 
-                    // Tell GameManager to add the score AND show colored feedback
-                    if (GameManager.Instance != null)
+                    // Tell ScoreManager to add the score AND show colored feedback
+                    if (ScoreManager.Instance != null)
                     {
-                        GameManager.Instance.AddPassiveScoreAndShowFeedback(scoreGeneratedThisTick, prodData.feedbackColor);
+                        ScoreManager.Instance.AddScoreAndShowFeedback(scoreGeneratedThisTick, prodData.feedbackColor);
                     }
 
                     // Reset timer, retaining the remainder
@@ -114,11 +120,77 @@ public class ProductionManager : MonoBehaviour
         // Note: No recalculation needed here as production is calculated per-frame in Update
         // UI updates are handled by OnProductionUpgradeStateChanged event when levels actually change (purchase)
         // Initial UI population should read the loaded state.
+
+        // Calculate initial rate based on loaded levels and notify listeners
+        UpdateTotalRateAndNotify();
+    }
+
+    /// <summary>
+    /// Calculates the total score generated per second by all active production upgrades.
+    /// </summary>
+    /// <returns>Total production rate (score per second).</returns>
+    public decimal GetTotalProductionRatePerSecond()
+    {
+        decimal totalRate = 0M;
+        foreach (var upgradeState in playerProductionUpgrades)
+        {
+            if (upgradeState.level > 0 && upgradeState.upgradeDataRef is ProductionUpgradeData prodData)
+            {
+                // Ensure tickRate is valid to prevent division by zero
+                if (prodData.tickRate > 0)
+                {
+                    // Calculate rate per second for this upgrade: (Amount per tick * Level) / Seconds per tick
+                    decimal ratePerSecond = (decimal)prodData.baseProductionAmount * upgradeState.level / (decimal)prodData.tickRate;
+                    totalRate += ratePerSecond;
+                }
+            }
+        }
+        return totalRate;
+    }
+
+    /// <summary>
+    /// Helper method to recalculate the total rate and invoke the event.
+    /// </summary>
+    private void UpdateTotalRateAndNotify()
+    {
+        decimal newRate = GetTotalProductionRatePerSecond();
+        OnTotalProductionRateChanged?.Invoke(newRate);
+        // Debug.Log($"Total Production Rate updated: {newRate:F1}/s"); // Optional debug log
+    }
+
+    /// <summary>
+    /// Loads production upgrade levels from PlayerPrefs.
+    /// Called by SaveLoadManager.
+    /// </summary>
+    public void LoadProductionUpgrades()
+    {
+        Debug.Log("ProductionManager: Loading production upgrade levels...");
+        bool anyLoaded = false;
+        bool stateChanged = false;
+        foreach (var upgradeState in playerProductionUpgrades)
+        {
+            if (upgradeState.upgradeDataRef != null && upgradeState.upgradeDataRef is ProductionUpgradeData prodData)
+            {
+                string key = ProdUpgradeLevelKeyPrefix + prodData.name;
+                int loadedLevel = PlayerPrefs.GetInt(key, 0);
+                if (upgradeState.level != loadedLevel)
+                {
+                    upgradeState.level = loadedLevel;
+                    upgradeState.productionTimer = 0f; // Reset timer on load
+                    OnProductionUpgradeStateChanged?.Invoke(upgradeState); // Notify UI
+                    anyLoaded = true;
+                    stateChanged = true;
+                }
+            }
+        }
+
+        if (anyLoaded) Debug.Log("ProductionManager: Levels loaded.");
+        if (stateChanged) UpdateTotalRateAndNotify(); // Recalculate total rate if levels changed
     }
 
     /// <summary>
     /// Saves production upgrade levels to PlayerPrefs.
-    /// Called by GameManager during the save process.
+    /// This method itself is called by SaveLoadManager.
     /// </summary>
     public void SaveProductionUpgrades()
     {
@@ -128,18 +200,19 @@ public class ProductionManager : MonoBehaviour
             {
                 string key = ProdUpgradeLevelKeyPrefix + prodData.name;
                 PlayerPrefs.SetInt(key, upgradeState.level);
+                // Debug.Log($"Saving Prod Upgrade: Key={key}, Level={upgradeState.level}");
             }
         }
-        // PlayerPrefs.Save() is called by GameManager after all saving is done.
+        // PlayerPrefs.Save() is called by SaveLoadManager after all saving is done.
     }
 
     /// <summary>
-    /// Resets the runtime state of all production upgrades to level 0.
-    /// Called by GameManager during the reset process.
+    /// Resets the runtime state AND saved data for production upgrades.
+    /// Called by SaveLoadManager during the reset process.
     /// </summary>
     public void ResetProductionUpgrades()
     {
-        Debug.Log("ResetProductionUpgrades: Resetting runtime levels...");
+        Debug.Log("ProductionManager: Resetting production upgrades...");
         bool stateChanged = false;
         foreach (var upgradeState in playerProductionUpgrades)
         {
@@ -147,12 +220,19 @@ public class ProductionManager : MonoBehaviour
             {
                 upgradeState.level = 0;
                 upgradeState.productionTimer = 0f; // Reset timer too
-                // Notify UI/listeners about the change for this specific upgrade
                 OnProductionUpgradeStateChanged?.Invoke(upgradeState);
                 stateChanged = true;
             }
+            // Delete the specific key
+            if (upgradeState.upgradeDataRef != null)
+            {
+                string key = ProdUpgradeLevelKeyPrefix + upgradeState.upgradeDataRef.name;
+                PlayerPrefs.DeleteKey(key);
+            }
         }
-        if (stateChanged) Debug.Log("ResetProductionUpgrades: Runtime levels reset.");
+        if (stateChanged) Debug.Log("ProductionManager: Runtime levels reset and PlayerPrefs keys deleted.");
+
+        UpdateTotalRateAndNotify(); // Update total rate (will be 0)
     }
 
     /// <summary>
@@ -195,18 +275,21 @@ public class ProductionManager : MonoBehaviour
         }
 
         decimal cost = CalculateUpgradeCost(dataToPurchase, upgradeState.level);
-        // Use GameManager's central purchase logic which now handles decimal costs
-        if (GameManager.Instance.TryPurchaseUpgrade(cost)) 
+        // Use ScoreManager's central purchase logic
+        if (ScoreManager.Instance != null && ScoreManager.Instance.TrySpendScore(cost))
         {
             upgradeState.level++;
             upgradeState.productionTimer = 0f; // Reset timer on purchase for fairness
             OnProductionUpgradeStateChanged?.Invoke(upgradeState); // Notify listeners (UI)
             Debug.Log($"Purchased '{dataToPurchase.upgradeName}' level {upgradeState.level} for {cost:F0}.");
+
+            // After successfully changing level, update total rate
+            UpdateTotalRateAndNotify();
             return true;
         }
         else
         {
-            Debug.Log($"Not enough score ({GameManager.Instance.GetCurrentScore():F1}) to purchase '{dataToPurchase.upgradeName}' level {upgradeState.level + 1} costing {cost:F0}");
+            Debug.Log($"Not enough score ({ScoreManager.Instance.GetCurrentScore():F1}) to purchase '{dataToPurchase.upgradeName}' level {upgradeState.level + 1} costing {cost:F0}");
         }
 
         return false;

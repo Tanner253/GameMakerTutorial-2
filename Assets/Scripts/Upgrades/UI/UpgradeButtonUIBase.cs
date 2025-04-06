@@ -62,9 +62,16 @@ public abstract class UpgradeButtonUIBase : MonoBehaviour
              Debug.LogError("ProductionManager instance not found for ProductionUpgradeUI!", gameObject);
              return false;
         }
-        if (this is ClickUpgradeUI && GameManager.Instance == null)
+        // Check ClickUpgradeManager for ClickUpgradeUI
+        if (this is ClickUpgradeUI && ClickUpgradeManager.Instance == null)
         {
-            Debug.LogError("GameManager instance not found for ClickUpgradeUI!", gameObject);
+            Debug.LogError("ClickUpgradeManager instance not found for ClickUpgradeUI!", gameObject);
+            return false;
+        }
+        // Check ScoreManager (needed for checking affordability)
+        if (ScoreManager.Instance == null)
+        {
+            Debug.LogError("ScoreManager instance not found! Cannot check purchase affordability.", gameObject);
             return false;
         }
         return true;
@@ -102,7 +109,8 @@ public abstract class UpgradeButtonUIBase : MonoBehaviour
     protected virtual void SubscribeToEvents()
     {
         if (purchaseButton != null) purchaseButton.onClick.AddListener(HandlePurchaseButtonClick);
-        if (GameManager.Instance != null) GameManager.Instance.OnScoreChanged += HandleScoreChanged;
+        // Subscribe to ScoreManager for score changes
+        if (ScoreManager.Instance != null) ScoreManager.Instance.OnScoreChanged += HandleScoreChanged;
 
         // Derived classes will subscribe to their specific upgrade change events
     }
@@ -113,7 +121,8 @@ public abstract class UpgradeButtonUIBase : MonoBehaviour
     protected virtual void UnsubscribeFromEvents()
     {
         if (purchaseButton != null) purchaseButton.onClick.RemoveListener(HandlePurchaseButtonClick);
-        if (GameManager.Instance != null) GameManager.Instance.OnScoreChanged -= HandleScoreChanged;
+        // Unsubscribe from ScoreManager
+        if (ScoreManager.Instance != null) ScoreManager.Instance.OnScoreChanged -= HandleScoreChanged;
 
         // Derived classes will unsubscribe from their specific upgrade change events
     }
@@ -146,9 +155,9 @@ public abstract class UpgradeButtonUIBase : MonoBehaviour
     /// </summary>
     protected void UpdatePurchaseButtonInteractability()
     {
-        if (purchaseButton == null || CurrentUpgradeState == null) return;
+        if (purchaseButton == null || CurrentUpgradeState == null || ScoreManager.Instance == null) return;
 
-        bool canAfford = GameManager.Instance.GetCurrentScore() >= CurrentCost;
+        bool canAfford = ScoreManager.Instance.GetCurrentScore() >= CurrentCost;
         SetButtonInteractable(canAfford);
     }
 
@@ -168,7 +177,7 @@ public abstract class UpgradeButtonUIBase : MonoBehaviour
     }
 
     /// <summary>
-    /// Called by GameManager when the score changes. Updates button interactability.
+    /// Called by ScoreManager when the score changes. Updates button interactability.
     /// </summary>
     private void HandleScoreChanged(decimal newScore)
     {

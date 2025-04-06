@@ -1,10 +1,10 @@
+using System;
 using System.Collections; // Needed for Coroutines
+using System.Globalization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-using System;
-using System.Globalization;
 
 public class ButtonCounter : MonoBehaviour, IPointerClickHandler
 {
@@ -12,7 +12,7 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
     public TextMeshProUGUI counterText;
     public Button clickButton; // Optional: Can be removed if IPointerClickHandler is sufficient
     public Animator coinAnimator;
-    
+
     private RectTransform rectTransform; // Store RectTransform for position
 
     // Define constants for number thresholds (using decimal for precision)
@@ -40,11 +40,13 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
         {
             GameManager.Instance.OnScoreChanged += UpdateCounterText;
             // Update text with initial score
-            UpdateCounterText(GameManager.Instance.GetCurrentScore()); 
+            UpdateCounterText(GameManager.Instance.GetCurrentScore());
         }
         else
         {
-            Debug.LogError("GameManager not found! ButtonCounter cannot register for score updates.");
+            Debug.LogError(
+                "GameManager not found! ButtonCounter cannot register for score updates."
+            );
         }
 
         // Optional: Add click listener to the button component
@@ -71,8 +73,8 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
         // If the click hit a different UI element (like the upgrade panel background),
         // ignore the click for the coin.
         if (eventData.pointerCurrentRaycast.gameObject != this.gameObject)
-        { 
-            return; 
+        {
+            return;
         }
 
         // If the click hit the coin itself, proceed with the click logic.
@@ -89,8 +91,10 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
         }
         else
         {
-             Debug.LogError("Cannot process click: GameManager instance or RectTransform is missing.");
-             return; // Don't proceed if we can't notify GameManager
+            Debug.LogError(
+                "Cannot process click: GameManager instance or RectTransform is missing."
+            );
+            return; // Don't proceed if we can't notify GameManager
         }
 
         // Trigger the coin's visual animation (remains local responsibility)
@@ -157,7 +161,7 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
         {
             return $"{(score / MillionThreshold):F2} M";
         }
-        
+
         // Format with commas for numbers less than a million
         // Use CultureInfo.InvariantCulture to ensure consistent decimal/group separators
         return score.ToString("N0", CultureInfo.InvariantCulture);

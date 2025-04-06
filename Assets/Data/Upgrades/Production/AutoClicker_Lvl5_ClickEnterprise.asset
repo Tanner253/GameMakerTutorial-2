@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b9fa273f40b9fe64eb343690c4f613cb, type: 3}
+  m_Name: AutoClicker_Lvl5_ClickEnterprise
+  m_EditorClassIdentifier: 
+  upgradeName: Click Enterprise
+  description: So big, it needs its own HR department just for the clicking division.
+    Generates 30 clicks/Tick per level.
+  baseProductionAmount: 10
+  tickRate: 5
+  baseCost: 400
+  costScaleFactor: 1.18
+  feedbackColor: {r: 0.10208259, g: 0.5849056, b: 0.123220965, a: 1}

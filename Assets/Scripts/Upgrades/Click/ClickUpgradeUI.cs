@@ -26,10 +26,10 @@ public class ClickUpgradeUI : UpgradeButtonUIBase
     {
         get
         {
-            // Retrieve state from GameManager
-            if (_currentUpgradeState == null && GameManager.Instance != null && clickUpgradeData != null)
+            // Retrieve state from ClickUpgradeManager
+            if (_currentUpgradeState == null && ClickUpgradeManager.Instance != null && clickUpgradeData != null)
             {
-                _currentUpgradeState = GameManager.Instance.GetClickUpgradeState(clickUpgradeData);
+                _currentUpgradeState = ClickUpgradeManager.Instance.GetClickUpgradeState(clickUpgradeData);
             }
             return _currentUpgradeState;
         }
@@ -39,10 +39,10 @@ public class ClickUpgradeUI : UpgradeButtonUIBase
     {
         get
         {
-            // Calculate cost using GameManager
-            if (GameManager.Instance != null && clickUpgradeData != null && CurrentUpgradeState != null)
+            // Calculate cost using ClickUpgradeManager
+            if (ClickUpgradeManager.Instance != null && clickUpgradeData != null && CurrentUpgradeState != null)
             {
-                 _currentCost = GameManager.Instance.CalculateClickUpgradeCost(clickUpgradeData, CurrentUpgradeState.level);
+                 _currentCost = ClickUpgradeManager.Instance.CalculateClickUpgradeCost(clickUpgradeData, CurrentUpgradeState.level);
             }
             return _currentCost;
         }
@@ -50,31 +50,42 @@ public class ClickUpgradeUI : UpgradeButtonUIBase
 
     protected override void TryPurchaseUpgrade()
     {
-        if (GameManager.Instance != null)
+        if (ClickUpgradeManager.Instance != null && ScoreManager.Instance != null)
         {
-            // Attempt purchase via GameManager
-            if (GameManager.Instance.TryPurchaseUpgrade(CurrentCost))
+            // Attempt purchase via ScoreManager
+            if (ScoreManager.Instance.TrySpendScore(CurrentCost))
             {
-                // If successful, apply the upgrade effect
-                GameManager.Instance.ApplyClickUpgrade(clickUpgradeData);
-                // UI updates are handled via the OnClickUpgradeStateChanged event
+                // If successful, apply the upgrade effect via ClickUpgradeManager
+                ClickUpgradeManager.Instance.ApplyClickUpgrade(clickUpgradeData);
+                // UI updates are handled via the OnClickUpgradeStateChanged event subscription
             }
             else
             {
                 // Handle purchase failure feedback if needed (e.g., button shake)
-                // Since button is disabled momentarily on click, explicit re-enable might be needed on fail
-                 UpdatePurchaseButtonInteractability(); // Re-check interactability immediately after fail
+                // Re-check interactability immediately after fail
+                 UpdatePurchaseButtonInteractability(); 
             }
         }
     }
 
     protected override void UpdateSpecificUI()
     {
-        // Update the click bonus text
+        // Update the click bonus text to show the *total* bonus from current level
         if (clickBonusText != null && clickUpgradeData != null)
         {
-            // Show the bonus this upgrade provides per level
-            clickBonusText.text = $"+{clickUpgradeData.clickBonusPerLevel:F1}/click";
+            int currentLevel = CurrentUpgradeState?.level ?? 0;
+            if (currentLevel > 0)
+            {
+                // Calculate total bonus from this upgrade at its current level
+                decimal totalBonusFromThis = (decimal)clickUpgradeData.clickBonusPerLevel * currentLevel;
+                clickBonusText.text = $"Bonus: +{totalBonusFromThis:F1}/click"; // Changed text format
+            }
+            else
+            {
+                // Show the base bonus per level if level is 0
+                clickBonusText.text = $"Bonus: +{clickUpgradeData.clickBonusPerLevel:F1}/click (per lvl)";
+            }
+
         }
     }
 
@@ -82,16 +93,19 @@ public class ClickUpgradeUI : UpgradeButtonUIBase
     protected override string GetUpgradeDescription() => clickUpgradeData?.description ?? "Error";
 
     /// <summary>
-    /// Handler for the GameManager's click upgrade change event.
+    /// Handler for the ClickUpgradeManager's upgrade change event.
     /// </summary>
     protected override void HandleSpecificUpgradePurchased(UpgradeState purchasedUpgradeState)
     {
         // Check if the event is for the upgrade this UI represents
         if (purchasedUpgradeState != null && purchasedUpgradeState.upgradeDataRef == this.clickUpgradeData)
         {
-            // Update cached state and recalculate cost
+            // Update cached state and recalculate cost using ClickUpgradeManager
             _currentUpgradeState = purchasedUpgradeState;
-            _currentCost = GameManager.Instance.CalculateClickUpgradeCost(clickUpgradeData, _currentUpgradeState.level);
+            if (ClickUpgradeManager.Instance != null)
+            {
+                 _currentCost = ClickUpgradeManager.Instance.CalculateClickUpgradeCost(clickUpgradeData, _currentUpgradeState.level);
+            }
             
             // Update the entire UI display
             UpdateUIDisplay();
@@ -107,11 +121,11 @@ public class ClickUpgradeUI : UpgradeButtonUIBase
 
     protected override void SubscribeToEvents()
     {
-        base.SubscribeToEvents(); // Subscribe to common events
-        // Subscribe to the click-specific event from GameManager
-        if (GameManager.Instance != null)
+        base.SubscribeToEvents(); // Subscribe to common events (button click, score changed)
+        // Subscribe to the click-specific event from ClickUpgradeManager
+        if (ClickUpgradeManager.Instance != null)
         {
-            GameManager.Instance.OnClickUpgradeStateChanged += HandleSpecificUpgradePurchased;
+            ClickUpgradeManager.Instance.OnClickUpgradeStateChanged += HandleSpecificUpgradePurchased;
         }
     }
 
@@ -119,9 +133,9 @@ public class ClickUpgradeUI : UpgradeButtonUIBase
     {
         base.UnsubscribeFromEvents(); // Unsubscribe from common events
         // Unsubscribe from the click-specific event
-        if (GameManager.Instance != null)
+        if (ClickUpgradeManager.Instance != null)
         {
-            GameManager.Instance.OnClickUpgradeStateChanged -= HandleSpecificUpgradePurchased;
+            ClickUpgradeManager.Instance.OnClickUpgradeStateChanged -= HandleSpecificUpgradePurchased;
         }
     }
 } 
