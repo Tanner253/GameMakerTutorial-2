@@ -325,21 +325,14 @@ public class GameManager : MonoBehaviour
             Debug.LogWarning($"Failed to parse saved score: {savedScoreString}. Resetting score to 0.");
         }
 
-        // Load Click Upgrade Levels (Now handled within InitializeClickUpgradeStates)
+        // Click Upgrade Levels are loaded in InitializeClickUpgradeStates
+        // Production Upgrade Levels are loaded in ProductionManager.InitializePlayerUpgrades
 
-        // Load Production Upgrade Levels (delegated)
-        // ProductionManager loads its own state during its initialization phase.
-        if (ProductionManager.Instance != null)
-        {
-             ProductionManager.Instance.LoadProductionUpgrades(); // Ensure this is called if needed after its Awake
-        }
-
-
-        // Important: Recalculate dependent values after loading
+        // Important: Recalculate dependent values after loading score and after upgrades have loaded their levels
         RecalculateTotalClickBonus(); // Recalculates additive bonus based on loaded levels
         // CalculateClickValue(); // This is called by RecalculateTotalClickBonus
 
-        Debug.Log($"Game state loaded. Score: {currentScore:F1}");
+        Debug.Log($"Game state (Score) loaded. Score: {currentScore:F1}. Upgrade levels loaded separately.");
         // UI updates will happen in Start or via OnScoreChanged/OnClickValueChanged events triggered by recalculations.
     }
 

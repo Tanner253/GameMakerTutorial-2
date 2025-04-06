@@ -90,13 +90,19 @@ public class ProductionManager : MonoBehaviour
     void InitializePlayerUpgrades()
     {
         playerProductionUpgrades = new List<UpgradeState>();
+        bool anyLoaded = false;
         foreach (var upgradeData in availableUpgradesData)
         {
             if (upgradeData != null)
             {
                 // Create an UpgradeState instance specifically for this production upgrade data
                 UpgradeState newState = new UpgradeState(upgradeData);
-                // Note: Loading happens in LoadProductionUpgrades, called by GameManager
+
+                // Load the saved level for this upgrade
+                string key = ProdUpgradeLevelKeyPrefix + upgradeData.name; // Use upgrade name as part of the key
+                newState.level = PlayerPrefs.GetInt(key, 0); // Default to 0 if not found
+                if (newState.level > 0) anyLoaded = true;
+
                 playerProductionUpgrades.Add(newState);
             }
             else
@@ -104,26 +110,7 @@ public class ProductionManager : MonoBehaviour
                 Debug.LogWarning("Null ProductionUpgradeData found in availableUpgradesData list.");
             }
         }
-        // Don't load here, GameManager controls the load timing
-    }
-
-    /// <summary>
-    /// Loads production upgrade levels from PlayerPrefs.
-    /// Should be called by GameManager after this manager is initialized.
-    /// </summary>
-    public void LoadProductionUpgrades()
-    {
-        bool anyLoaded = false;
-        foreach (var upgradeState in playerProductionUpgrades)
-        {
-            if (upgradeState.upgradeDataRef != null && upgradeState.upgradeDataRef is ProductionUpgradeData prodData)
-            {
-                string key = ProdUpgradeLevelKeyPrefix + prodData.name; // Use name for key
-                upgradeState.level = PlayerPrefs.GetInt(key, 0);
-                if (upgradeState.level > 0) anyLoaded = true;
-            }
-        }
-        if (anyLoaded) Debug.Log("Production upgrade levels loaded.");
+        if (anyLoaded) Debug.Log("Production upgrade levels loaded during initialization.");
         // Note: No recalculation needed here as production is calculated per-frame in Update
         // UI updates are handled by OnProductionUpgradeStateChanged event when levels actually change (purchase)
         // Initial UI population should read the loaded state.

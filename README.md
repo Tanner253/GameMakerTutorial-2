@@ -1,3 +1,5 @@
+[![YouTube Short Thumbnail](https://img.youtube.com/vi/MZ_njOt_zr8/0.jpg)](https://www.youtube.com/shorts/MZ_njOt_zr8)
+
 # GameMakerTutorial-2
 
 [![MCP](https://img.shields.io/badge/MCP-Active-brightgreen)](https://github.com/Tanner253/GameMakerTutorial-2)
