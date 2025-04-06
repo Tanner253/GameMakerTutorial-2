@@ -134,6 +134,28 @@ public class ProductionManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Resets the runtime state of all production upgrades to level 0.
+    /// Called by GameManager during the reset process.
+    /// </summary>
+    public void ResetProductionUpgrades()
+    {
+        Debug.Log("ResetProductionUpgrades: Resetting runtime levels...");
+        bool stateChanged = false;
+        foreach (var upgradeState in playerProductionUpgrades)
+        {
+            if (upgradeState.level != 0)
+            {
+                upgradeState.level = 0;
+                upgradeState.productionTimer = 0f; // Reset timer too
+                // Notify UI/listeners about the change for this specific upgrade
+                OnProductionUpgradeStateChanged?.Invoke(upgradeState);
+                stateChanged = true;
+            }
+        }
+        if (stateChanged) Debug.Log("ResetProductionUpgrades: Runtime levels reset.");
+    }
+
+    /// <summary>
     /// Gets the current runtime state (level) of a specific production upgrade.
     /// </summary>
     /// <param name="data">The ProductionUpgradeData asset to query.</param>

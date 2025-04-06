@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic; // Needed for Dictionary
 using System.Linq;
 using System.Globalization; // Needed for robust decimal conversion
+using UnityEngine.SceneManagement; // Needed for scene reloading
 
 public class GameManager : MonoBehaviour
 {
@@ -95,6 +96,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     void InitializeClickUpgradeStates()
     {
+        Debug.Log("InitializeClickUpgradeStates: Starting...");
         playerClickUpgradesState = new Dictionary<ClickUpgradeData, UpgradeState>();
         foreach (var clickData in availableClickUpgradesData)
         {
@@ -105,11 +107,15 @@ public class GameManager : MonoBehaviour
 
                 // Load the saved level for this upgrade
                 string key = ClickUpgradeLevelKeyPrefix + clickData.name; // Use upgrade name as part of the key
-                newState.level = PlayerPrefs.GetInt(key, 0); // Default to 0 if not found
+                // Use -1 default in log to clearly distinguish from a valid saved 0
+                int loadedLevel = PlayerPrefs.GetInt(key, 0); 
+                Debug.Log($"InitializeClickUpgradeStates: Loading level for {clickData.name}. Key: {key}, Value Read: {PlayerPrefs.GetInt(key, -1)}, Using Level: {loadedLevel}"); 
+                newState.level = loadedLevel;
 
                 playerClickUpgradesState.Add(clickData, newState);
             }
         }
+        Debug.Log("InitializeClickUpgradeStates: Finished loading levels. Recalculating bonus...");
         // After initializing AND loading levels, recalculate the total bonus
         RecalculateTotalClickBonus(); // This also calls CalculateClickValue
     }
@@ -313,8 +319,11 @@ public class GameManager : MonoBehaviour
     /// </summary>
     void LoadGame()
     {
+        Debug.Log("LoadGame: Starting...");
         // Load Score
+        // Use "NULL" default in log to clearly see if key exists
         string savedScoreString = PlayerPrefs.GetString(ScoreKey, "0");
+        Debug.Log($"LoadGame: Loading score. Key: {ScoreKey}, Value Read: {PlayerPrefs.GetString(ScoreKey, "NULL")}"); 
         if (decimal.TryParse(savedScoreString, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal loadedScore))
         {
             currentScore = loadedScore;
@@ -322,7 +331,7 @@ public class GameManager : MonoBehaviour
         else
         {
             currentScore = 0.0M;
-            Debug.LogWarning($"Failed to parse saved score: {savedScoreString}. Resetting score to 0.");
+            Debug.LogWarning($"LoadGame: Failed to parse saved score: {savedScoreString}. Resetting score to 0.");
         }
 
         // Click Upgrade Levels are loaded in InitializeClickUpgradeStates
@@ -332,7 +341,7 @@ public class GameManager : MonoBehaviour
         RecalculateTotalClickBonus(); // Recalculates additive bonus based on loaded levels
         // CalculateClickValue(); // This is called by RecalculateTotalClickBonus
 
-        Debug.Log($"Game state (Score) loaded. Score: {currentScore:F1}. Upgrade levels loaded separately.");
+        Debug.Log($"LoadGame: Finished. Score: {currentScore:F1}. Upgrade levels loaded separately.");
         // UI updates will happen in Start or via OnScoreChanged/OnClickValueChanged events triggered by recalculations.
     }
 
@@ -349,6 +358,54 @@ public class GameManager : MonoBehaviour
     void OnApplicationQuit()
     {
         SaveGame();
+    }
+
+    /// <summary>
+    /// Deletes all saved PlayerPrefs data and reloads the current scene.
+    /// </summary>
+    public void ResetGameData()
+    {
+        Debug.Log("--- ResetGameData method called! ---");
+        Debug.Log("ResetGameData: Resetting runtime state...");
+
+        // 1. Reset runtime values
+        currentScore = 0M;
+        additiveClickBonus = 0M;
+        CalculatedClickValue = baseClickValue; // Reset to base
+
+        // Re-initialize click upgrade dictionary with level 0
+        playerClickUpgradesState.Clear();
+        foreach (var clickData in availableClickUpgradesData)
+        {
+            if (clickData != null)
+            {
+                playerClickUpgradesState.Add(clickData, new UpgradeState(clickData) { level = 0 });
+            }
+        }
+        // Trigger immediate updates for any listeners (though scene reload will also do this)
+        OnScoreChanged?.Invoke(currentScore);
+        OnClickValueChanged?.Invoke(CalculatedClickValue); 
+        // Notify UI about all click upgrades being reset (important for UI listening to this)
+        foreach(var state in playerClickUpgradesState.Values)
+        {
+            OnClickUpgradeStateChanged?.Invoke(state);
+        }
+
+        // Reset production upgrades (assuming ProductionManager might also persist or needs explicit reset call)
+        // If ProductionManager reloads cleanly with the scene, this might be redundant, but safer to include.
+        if (ProductionManager.Instance != null)
+        {   
+            ProductionManager.Instance.ResetProductionUpgrades(); // We'll need to add this method
+        }
+
+        Debug.Log("ResetGameData: Deleting PlayerPrefs...");
+        PlayerPrefs.DeleteAll(); // 2. Delete saved persistent data
+        PlayerPrefs.Save();
+        Debug.Log("ResetGameData: PlayerPrefs deleted and saved. Reloading scene...");
+
+        // 3. Reload the scene to reset everything else
+        Scene currentScene = SceneManager.GetActiveScene();
+        SceneManager.LoadScene(currentScene.name);
     }
 
     void Update()
