@@ -134,7 +134,7 @@ public class ClickUpgradeButton : MonoBehaviour
         if (costText != null)
         {
             // Display the *current* calculated cost
-            costText.text = $"Cost: {currentCost}";
+            costText.text = $"Click Upgrade Cost: {currentCost}";
         }
         if (descriptionText != null)
         {
