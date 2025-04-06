@@ -103,7 +103,7 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
         if (counterText != null)
         {
             // Format the decimal score to display with one decimal place
-            counterText.text = $"count: {newScore:F1}";
+            counterText.text = $"Cryptons: {newScore:F1}";
         }
         else
         {

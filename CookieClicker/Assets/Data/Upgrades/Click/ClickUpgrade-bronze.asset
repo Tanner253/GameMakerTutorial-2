@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   upgradeName: Bronze Click Upgrade
   description: Enhance your clicks with the power of bronze!
-  clickBonusPerLevel: 2
-  baseCost: 100
+  clickBonusPerLevel: 1
+  baseCost: 50
   costScaleFactor: 1.1

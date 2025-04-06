@@ -1,6 +1,4 @@
-#Click me! 
-
-----> [![YouTube Short Thumbnail](https://img.youtube.com/vi/MZ_njOt_zr8/0.jpg)](https://www.youtube.com/shorts/MZ_njOt_zr8)
+[![YouTube Short Thumbnail](https://img.youtube.com/vi/MZ_njOt_zr8/0.jpg)](https://www.youtube.com/shorts/MZ_njOt_zr8)
 
 # GameMakerTutorial-2
 
