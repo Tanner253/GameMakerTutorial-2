@@ -17,6 +17,10 @@ public class ProductionManager : MonoBehaviour
     // Runtime state of PRODUCTION upgrades the player owns or can purchase
     private List<UpgradeState> playerProductionUpgrades;
 
+    private decimal totalProductionPerSecond = 0M;
+    private float productionTimer = 0f;
+    private const float PRODUCTION_INTERVAL = 1.0f; // Calculate and add score every second
+
     /// <summary>
     /// Fired when a production upgrade's state changes (e.g., purchased).
     /// Passes the updated UpgradeState.
@@ -37,6 +41,21 @@ public class ProductionManager : MonoBehaviour
         }
 
         InitializePlayerUpgrades();
+        CalculateTotalProduction();
+    }
+
+    void Update()
+    {
+        productionTimer += Time.deltaTime;
+        if (productionTimer >= PRODUCTION_INTERVAL)
+        {
+            decimal scoreToAdd = totalProductionPerSecond * (decimal)PRODUCTION_INTERVAL;
+            if (scoreToAdd > 0)
+            {
+                GameManager.Instance.AddPassiveScore(scoreToAdd);
+            }
+            productionTimer -= PRODUCTION_INTERVAL; // Reset timer, retaining overshoot
+        }
     }
 
     void InitializePlayerUpgrades()
@@ -54,6 +73,24 @@ public class ProductionManager : MonoBehaviour
                 Debug.LogWarning("Null ProductionUpgradeData found in availableUpgradesData list.");
             }
         }
+    }
+
+    void CalculateTotalProduction()
+    {
+        totalProductionPerSecond = 0M;
+        foreach (var upgradeState in playerProductionUpgrades)
+        {
+            // Ensure the dataRef is actually ProductionUpgradeData before accessing its fields
+            if (upgradeState.upgradeDataRef is ProductionUpgradeData prodData && upgradeState.level > 0 && prodData.tickRate > 0)
+            {
+                // Production per second = (amount per tick) * (ticks per second)
+                // Cast float baseProductionAmount to decimal before multiplying
+                decimal productionPerTick = (decimal)prodData.baseProductionAmount * upgradeState.level; // Linear scaling per level
+                decimal ticksPerSecond = 1M / (decimal)prodData.tickRate;
+                totalProductionPerSecond += productionPerTick * ticksPerSecond;
+            }
+        }
+        // Debug.Log($"Total Production Per Second: {totalProductionPerSecond:F2}");
     }
 
     /// <summary>
@@ -100,8 +137,9 @@ public class ProductionManager : MonoBehaviour
         if (GameManager.Instance.TryPurchaseUpgrade(cost)) 
         {
             upgradeState.level++;
+            CalculateTotalProduction(); // Recalculate production after purchase
             OnProductionUpgradeStateChanged?.Invoke(upgradeState); // Notify listeners (UI)
-            Debug.Log($"Purchased '{dataToPurchase.upgradeName}' level {upgradeState.level} for {cost:F0}.");
+            Debug.Log($"Purchased '{dataToPurchase.upgradeName}' level {upgradeState.level} for {cost:F0}. New total PPS: {totalProductionPerSecond:F2}");
             return true;
         }
         else

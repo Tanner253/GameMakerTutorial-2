@@ -71,7 +71,7 @@ public class GameManager : MonoBehaviour
     {
         if (floatingTextManager == null)
         {
-            floatingTextManager = FindFirstObjectByType<FloatingTextManager>();
+            floatingTextManager = FindObjectOfType<FloatingTextManager>();
             if (floatingTextManager == null)
             {
                 Debug.LogError("GameManager could not find a FloatingTextManager in the scene!");
@@ -149,31 +149,6 @@ public class GameManager : MonoBehaviour
         }
 
         OnScoreChanged?.Invoke(currentScore);
-    }
-
-    /// <summary>
-    /// Processes a score addition from an automated source (e.g., auto-clicker)
-    /// and displays floating text at the specified position.
-    /// </summary>
-    /// <param name="amount">The amount of score generated.</param>
-    /// <param name="position">The Canvas position where the text should originate.</param>
-    public void ProcessAutoClickerTick(decimal amount, Vector2 position)
-    {
-        if (amount <= 0) return;
-
-        currentScore += amount;
-        OnScoreChanged?.Invoke(currentScore); // Update UI
-
-        // Show floating text using the manager
-        if (floatingTextManager != null)
-        {
-            // You might want a different color for auto-clicks vs manual clicks
-            // Example: Color.yellow
-            // Reverting temporary change - use 3 arguments again
-            floatingTextManager.ShowFloatingText(amount, position, Color.yellow); 
-        }
-        // Optionally add a less verbose Debug log compared to manual clicks
-        // Debug.Log($"Auto-clicker added {amount:F1}. Score: {currentScore:F1}");
     }
 
     // Return decimal score
