@@ -12,9 +12,18 @@ public class FloatingTextManager : MonoBehaviour
     public float floatSpeed = 100f;    // How fast the text floats up
     public float randomXRange = 100f;   // Max random horizontal offset (+/-)
     public float randomYRange = 50f;    // Max random vertical offset (+/-)
+    [Tooltip("Set the font size for the feedback text.")]
+    public float feedbackFontSize = 36f; // Added font size control
 
     // Method to be called by other scripts (like GameManager)
+    // Overload 1: Default color (from prefab)
     public void ShowFloatingText(decimal value, Vector2 sourceAnchoredPosition)
+    {
+        ShowFloatingText(value, sourceAnchoredPosition, null);
+    }
+
+    // Overload 2: Specific color
+    public void ShowFloatingText(decimal value, Vector2 sourceAnchoredPosition, Color? textColor)
     {
         if (floatingTextPrefab == null || textSpawnParent == null)
         {
@@ -49,8 +58,19 @@ public class FloatingTextManager : MonoBehaviour
         {
             // Format decimal value
             textMesh.text = $"+{value:F1}";
-            // Start the animation coroutine, passing the RectTransform
-            StartCoroutine(FloatAndFadeText(textInstance, textRectTransform, textMesh));
+
+            // Set the font size
+            textMesh.fontSize = feedbackFontSize;
+
+            // Set color if provided, otherwise use prefab's default
+            if (textColor.HasValue)
+            {
+                textMesh.color = textColor.Value;
+            }
+
+            // Start the animation coroutine, passing the RectTransform and the *initial* color
+            // The coroutine will handle fading from this initial color.
+            StartCoroutine(FloatAndFadeText(textInstance, textRectTransform, textMesh, textMesh.color));
         }
         else
         {
@@ -60,9 +80,9 @@ public class FloatingTextManager : MonoBehaviour
     }
 
     // Coroutine to handle floating and fading
-    IEnumerator FloatAndFadeText(GameObject instance, RectTransform rectTransform, TextMeshProUGUI textMesh)
+    // Now takes the starting color as an argument
+    IEnumerator FloatAndFadeText(GameObject instance, RectTransform rectTransform, TextMeshProUGUI textMesh, Color startColor)
     {
-        Color startColor = textMesh.color;
         float timer = 0f;
 
         while (timer < floatDuration)

@@ -56,6 +56,15 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
     // Called by Unity's Event System when the GameObject is clicked
     public void OnPointerClick(PointerEventData eventData)
     {
+        // Check if the object clicked is NOT this specific coin GameObject.
+        // If the click hit a different UI element (like the upgrade panel background),
+        // ignore the click for the coin.
+        if (eventData.pointerCurrentRaycast.gameObject != this.gameObject)
+        { 
+            return; 
+        }
+
+        // If the click hit the coin itself, proceed with the click logic.
         HandleClick();
     }
 

@@ -14,5 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   upgradeName: Auto-Clicker
   description: Generates 0.1 Clicks Per Tick.
+  baseProductionAmount: 0.1
   tickRate: 1
+  baseCost: 10
   costScaleFactor: 1.15
+  feedbackColor: {r: 1, g: 0.98332196, b: 0, a: 1}

@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   upgradeName: Basic Click Upgrade
   description: Nothing Special about this one.
-  clickBonusPerLevel: 1
+  clickBonusPerLevel: 0.1
   baseCost: 10
   costScaleFactor: 1.07

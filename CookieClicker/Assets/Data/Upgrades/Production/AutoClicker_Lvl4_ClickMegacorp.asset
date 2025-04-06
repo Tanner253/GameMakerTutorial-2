@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b9fa273f40b9fe64eb343690c4f613cb, type: 3}
-  m_Name: AutoClicker_Lvl2_ClickFarm
+  m_Name: AutoClicker_Lvl4_ClickMegacorp
   m_EditorClassIdentifier: 
-  upgradeName: Click Farm
-  description: Employs several... enthusiastic clickers. Generates 5 clicks per second
+  upgradeName: Click MegaCorp
+  description: A multinational corporation dedicated to clicking. Generates 5.0 clicks/Tick
     per level.
-  baseProductionAmount: 0.5
-  tickRate: 2
-  baseCost: 20
-  costScaleFactor: 1.16
-  feedbackColor: {r: 1, g: 0.39164284, b: 0, a: 1}
+  baseProductionAmount: 5
+  tickRate: 5
+  baseCost: 200
+  costScaleFactor: 1.18
+  feedbackColor: {r: 1, g: 0, b: 0.7929859, a: 1}

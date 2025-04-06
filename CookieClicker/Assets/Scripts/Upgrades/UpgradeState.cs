@@ -11,6 +11,9 @@ public class UpgradeState
     public ScriptableObject upgradeDataRef; // Reference to the specific data asset (ClickUpgradeData or ProductionUpgradeData)
     public int level = 0;
 
+    // Production-specific state
+    public float productionTimer = 0f; // Timer for individual production ticks
+
     public UpgradeState(ScriptableObject dataRef)
     {
         if (dataRef == null)
@@ -19,5 +22,6 @@ public class UpgradeState
         }
         this.upgradeDataRef = dataRef;
         this.level = 0; // Start at level 0 (unpurchased)
+        this.productionTimer = 0f; // Initialize timer
     }
 } 
