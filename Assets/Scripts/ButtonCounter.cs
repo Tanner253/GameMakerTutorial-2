@@ -3,6 +3,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using System;
+using System.Globalization;
 
 public class ButtonCounter : MonoBehaviour, IPointerClickHandler
 {
@@ -12,6 +14,15 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
     public Animator coinAnimator;
     
     private RectTransform rectTransform; // Store RectTransform for position
+
+    // Define constants for number thresholds (using decimal for precision)
+    private static readonly decimal CryptonThreshold = 1_000_000_000_000_000_000_000_000m;
+    private static readonly decimal SextillionThreshold = 1_000_000_000_000_000_000_000m;
+    private static readonly decimal QuintillionThreshold = 1_000_000_000_000_000_000m;
+    private static readonly decimal QuadrillionThreshold = 1_000_000_000_000_000m;
+    private static readonly decimal TrillionThreshold = 1_000_000_000_000m;
+    private static readonly decimal BillionThreshold = 1_000_000_000m;
+    private static readonly decimal MillionThreshold = 1_000_000m;
 
     void Awake()
     {
@@ -102,12 +113,53 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
     {
         if (counterText != null)
         {
-            // Format the decimal score to display with one decimal place
-            counterText.text = $"Cryptons: {newScore:F1}";
+            // Use the new helper method to format the score
+            counterText.text = FormatScore(newScore);
         }
         else
         {
             Debug.LogWarning("CounterText is not assigned in ButtonCounter!", this);
         }
+    }
+
+    /// <summary>
+    /// Formats the score with commas and abbreviations (M, B, T, Qd, Qt, Sx, C).
+    /// </summary>
+    /// <param name="score">The score to format.</param>
+    /// <returns>Formatted score string.</returns>
+    public static string FormatScore(decimal score)
+    {
+        if (score >= CryptonThreshold)
+        {
+            return $"{(score / SextillionThreshold):F2} C"; // Use Sextillion base for Cryptons
+        }
+        if (score >= SextillionThreshold)
+        {
+            return $"{(score / SextillionThreshold):F2} Sx";
+        }
+        if (score >= QuintillionThreshold)
+        {
+            return $"{(score / QuintillionThreshold):F2} Qt";
+        }
+        if (score >= QuadrillionThreshold)
+        {
+            return $"{(score / QuadrillionThreshold):F2} Qd";
+        }
+        if (score >= TrillionThreshold)
+        {
+            return $"{(score / TrillionThreshold):F2} T";
+        }
+        if (score >= BillionThreshold)
+        {
+            return $"{(score / BillionThreshold):F2} B";
+        }
+        if (score >= MillionThreshold)
+        {
+            return $"{(score / MillionThreshold):F2} M";
+        }
+        
+        // Format with commas for numbers less than a million
+        // Use CultureInfo.InvariantCulture to ensure consistent decimal/group separators
+        return score.ToString("N0", CultureInfo.InvariantCulture);
     }
 }

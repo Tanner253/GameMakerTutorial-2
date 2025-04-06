@@ -21,30 +21,36 @@ public class ResetButtonHelper : MonoBehaviour
 
             // Add the listener purely through code, targeting the current instance
             resetButton.onClick.AddListener(gameManager.ResetGameData);
-             Debug.Log($"ResetButtonHelper: Added listener for GameManager.ResetGameData on {gameObject.name}");
+            Debug.Log(
+                $"ResetButtonHelper: Added listener for GameManager.ResetGameData on {gameObject.name}"
+            );
         }
         else
         {
             if (resetButton == null)
             {
-                 Debug.LogError("ResetButtonHelper: Button component not found!", this);
+                Debug.LogError("ResetButtonHelper: Button component not found!", this);
             }
-             if (gameManager == null)
+            if (gameManager == null)
             {
-                 Debug.LogError("ResetButtonHelper: GameManager.Instance is null! Make sure GameManager is active.", this);
+                Debug.LogError(
+                    "ResetButtonHelper: GameManager.Instance is null! Make sure GameManager is active.",
+                    this
+                );
             }
             // Disable the button if setup failed
-             if(resetButton != null) resetButton.interactable = false;
+            if (resetButton != null)
+                resetButton.interactable = false;
         }
     }
 
-     // Optional: Good practice to remove listeners when the object is destroyed
-     void OnDestroy()
-     {
-         // Check if Instance is still valid before trying to access it
-         if (GameManager.Instance != null && resetButton != null)
-         {
-             resetButton.onClick.RemoveListener(GameManager.Instance.ResetGameData); // Attempt removal
-         }
-     }
-} 
+    // Optional: Good practice to remove listeners when the object is destroyed
+    void OnDestroy()
+    {
+        // Check if Instance is still valid before trying to access it
+        if (GameManager.Instance != null && resetButton != null)
+        {
+            resetButton.onClick.RemoveListener(GameManager.Instance.ResetGameData); // Attempt removal
+        }
+    }
+}
