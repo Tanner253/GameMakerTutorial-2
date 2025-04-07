@@ -244,9 +244,17 @@ public class ClickUpgradeManager : MonoBehaviour
                 OnClickUpgradeStateChanged?.Invoke(state); // Notify UI of reset
                 changed = true;
             }
-            // Delete the specific key
-            string key = ClickUpgradeLevelKeyPrefix + state.upgradeData.name;
-            PlayerPrefs.DeleteKey(key);
+            // Delete the specific key using the correct property name
+            if (state.upgradeDataRef != null) // Use upgradeDataRef
+            {
+                 string key = ClickUpgradeLevelKeyPrefix + state.upgradeDataRef.name;
+                 PlayerPrefs.DeleteKey(key);
+            }
+            else
+            {
+                // This case is less likely if initialization is correct, but good to handle
+                Debug.LogWarning("UpgradeState found with null upgradeDataRef during reset.");
+            }
         }
 
         if (changed)

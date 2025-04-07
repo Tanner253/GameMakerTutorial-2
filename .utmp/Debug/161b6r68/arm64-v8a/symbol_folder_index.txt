@@ -1,0 +1,1 @@
+C:\Users\perci\source\repos\Unity\GameMakerTutorial-2\CookieClicker\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\build\intermediates\cxx\Debug\161b6r68\obj\arm64-v8a

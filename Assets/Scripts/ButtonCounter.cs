@@ -35,17 +35,17 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
 
     void Start()
     {
-        // Register for score updates from GameManager
-        if (GameManager.Instance != null)
+        // Register for score updates from ScoreManager
+        if (ScoreManager.Instance != null)
         {
-            GameManager.Instance.OnScoreChanged += UpdateCounterText;
+            ScoreManager.Instance.OnScoreChanged += UpdateCounterText;
             // Update text with initial score
-            UpdateCounterText(GameManager.Instance.GetCurrentScore());
+            UpdateCounterText(ScoreManager.Instance.GetCurrentScore());
         }
         else
         {
             Debug.LogError(
-                "GameManager not found! ButtonCounter cannot register for score updates."
+                "ScoreManager not found! ButtonCounter cannot register for score updates or get initial score."
             );
         }
 
@@ -59,10 +59,10 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
 
     void OnDestroy()
     {
-        // Unregister from GameManager event when this object is destroyed
-        if (GameManager.Instance != null)
+        // Unregister from ScoreManager event when this object is destroyed
+        if (ScoreManager.Instance != null)
         {
-            GameManager.Instance.OnScoreChanged -= UpdateCounterText;
+            ScoreManager.Instance.OnScoreChanged -= UpdateCounterText;
         }
     }
 
