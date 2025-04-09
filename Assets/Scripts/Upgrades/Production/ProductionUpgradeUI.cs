@@ -52,11 +52,57 @@ public class ProductionUpgradeUI : UpgradeButtonUIBase
 
     protected override void TryPurchaseUpgrade()
     {
-        if (ProductionManager.Instance != null)
+        // This method is called by the base class's HandlePurchaseButtonClick
+        if (productionUpgradeData == null) 
         {
-            ProductionManager.Instance.TryPurchaseUpgrade(productionUpgradeData);
-            // UI updates are handled via the OnProductionUpgradeStateChanged event
+             Debug.LogError("TryPurchaseUpgrade failed: productionUpgradeData is null.");
+             return;
+         }
+        if (ScoreManager.Instance == null) 
+        {
+             Debug.LogError("TryPurchaseUpgrade failed: ScoreManager instance is null.");
+             return;
+         }
+        if (ProductionManager.Instance == null)
+        {
+             Debug.LogError("TryPurchaseUpgrade failed: ProductionManager instance is null.");
+             return;
         }
+
+        // Get current state (use the property which might already have it cached)
+        UpgradeState currentState = CurrentUpgradeState;
+        if (currentState == null)
+        {
+            Debug.LogError($"TryPurchaseUpgrade failed: Could not get state for {productionUpgradeData.name}");
+            return;
+        }
+
+        // Get current cost (use the property which might already have it cached)
+        decimal cost = CurrentCost; 
+
+        // Attempt to spend the score
+        if (ScoreManager.Instance.TrySpendScore(cost))
+        {
+            // If successful, apply the upgrade in the ProductionManager
+            ProductionManager.Instance.ApplyUpgrade(productionUpgradeData);
+            // The ProductionManager's ApplyUpgrade will trigger OnProductionUpgradeStateChanged,
+            // which should cause this UI element to update via HandleSpecificUpgradePurchased.
+            Debug.Log($"Successfully purchased {productionUpgradeData.upgradeName} level {currentState.level + 1} for {cost:F0}");
+            // Play purchase sound or animation if desired
+        }
+        else
+        {
+            // Handle insufficient funds (e.g., show a message, play a sound)
+            Debug.Log($"Insufficient funds to purchase {productionUpgradeData.upgradeName}. Need {cost:F0}, have {ScoreManager.Instance.GetCurrentScore():F0}");
+            // Optional: Trigger UI feedback (shake button, change color briefly)
+            // Re-enable button interactability slightly later if purchase fails, 
+            // otherwise HandleScoreChanged will re-enable it if score is sufficient.
+            // We might not need this if HandleScoreChanged covers it.
+             // Invoke("UpdatePurchaseButtonInteractability", 0.1f); // Example delay
+             UpdatePurchaseButtonInteractability(); // Try immediately first
+        }
+        // Note: Base class HandlePurchaseButtonClick already disables the button temporarily.
+        // The button state will be refreshed by HandleScoreChanged or HandleSpecificUpgradePurchased.
     }
 
     protected override void UpdateSpecificUI()

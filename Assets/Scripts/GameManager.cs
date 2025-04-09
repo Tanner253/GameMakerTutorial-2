@@ -49,27 +49,44 @@ public class GameManager : MonoBehaviour
         globalProgressionScale = Mathf.Max(0.1f, globalProgressionScale);
 
         // --- Find Manager References if not assigned ---
-        // It's generally better to assign these in the Inspector
-        if (scoreManager == null) scoreManager = FindObjectOfType<ScoreManager>();
-        if (clickUpgradeManager == null) clickUpgradeManager = FindObjectOfType<ClickUpgradeManager>();
-        if (productionManager == null) productionManager = FindObjectOfType<ProductionManager>();
-        if (saveLoadManager == null) saveLoadManager = FindObjectOfType<SaveLoadManager>();
-        if (floatingTextManager == null) floatingTextManager = FindObjectOfType<FloatingTextManager>();
+        // It's generally better to assign these in the Inspector, but this provides fallback.
+        if (scoreManager == null) scoreManager = FindFirstObjectByType<ScoreManager>();
+        if (clickUpgradeManager == null) clickUpgradeManager = FindFirstObjectByType<ClickUpgradeManager>();
+        if (productionManager == null) productionManager = FindFirstObjectByType<ProductionManager>(); // May still be null if not in scene
+        if (saveLoadManager == null) saveLoadManager = FindFirstObjectByType<SaveLoadManager>();
+        if (floatingTextManager == null) floatingTextManager = FindFirstObjectByType<FloatingTextManager>();
 
         // Null check managers after attempting to find them
         if (scoreManager == null) Debug.LogError("GameManager could not find ScoreManager!");
         if (clickUpgradeManager == null) Debug.LogError("GameManager could not find ClickUpgradeManager!");
-        if (productionManager == null) Debug.LogWarning("GameManager could not find ProductionManager (might be okay if no production upgrades).");
+        // ProductionManager can be optional
+        if (productionManager == null) Debug.LogWarning("GameManager could not find ProductionManager (This is expected if the scene doesn't use passive production).");
         if (saveLoadManager == null) Debug.LogError("GameManager could not find SaveLoadManager!");
         if (floatingTextManager == null) Debug.LogError("GameManager could not find FloatingTextManager!");
 
         // --- Initialization and Loading ---
-        saveLoadManager?.InitializeManagers(); // SaveLoadManager now coordinates loading/initialization
-
+        // Ensure SaveLoadManager exists before trying to initialize
+        if (saveLoadManager != null)
+        {
+             saveLoadManager.InitializeManagers(); // SaveLoadManager now coordinates loading/initialization
+        }
+        else
+        {
+             Debug.LogError("CRITICAL: SaveLoadManager not found! Game cannot be loaded or saved.");
+             // Handle this critical error appropriately - maybe load defaults manually or stop execution?
+        }
+       
         // Subscribe to ProductionManager's event (if it exists)
         if (productionManager != null)
         {
             productionManager.OnTotalProductionRateChanged += UpdateProductionRateDisplay;
+            // Also update display with initial rate from ProductionManager if it exists
+            UpdateProductionRateDisplay(productionManager.GetTotalProductionRatePerSecond());
+        }
+        else
+        {
+            // Set display to 0 if no production manager
+            UpdateProductionRateDisplay(0);
         }
     }
 
@@ -153,18 +170,10 @@ public class GameManager : MonoBehaviour
     {
         if (totalProductionRateText != null)
         {
-            // Format as needed (e.g., "Generating: X.X/s")
-            // Consider moving formatting to a utility class if it becomes complex
-            string formattedRate;
-            if (newTotalRate >= 1000000000) formattedRate = (newTotalRate / 1000000000M).ToString("0.##B");
-            else if (newTotalRate >= 1000000) formattedRate = (newTotalRate / 1000000M).ToString("0.##M");
-            else if (newTotalRate >= 1000) formattedRate = (newTotalRate / 1000M).ToString("0.##K");
-            else formattedRate = newTotalRate.ToString("F1");
+            // Use the utility formatter
+            string formattedRate = NumberFormatter.FormatNumber(newTotalRate);
 
             totalProductionRateText.text = $"Generating: {formattedRate}/s";
         }
     }
-
-    // Example of Update, can be removed if not used
-    void Update() { }
 }

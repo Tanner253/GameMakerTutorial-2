@@ -1,6 +1,7 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
+using System.Linq; // Needed for Linq queries
 
 // Manages click-based upgrades
 public class ClickUpgradeManager : MonoBehaviour
@@ -25,9 +26,6 @@ public class ClickUpgradeManager : MonoBehaviour
     public event Action<decimal> OnClickValueChanged; // Fired when the calculated click value changes
     public event Action<UpgradeState> OnClickUpgradeStateChanged; // Fired when an upgrade level changes
 
-    // --- Constants ---
-    private const string ClickUpgradeLevelKeyPrefix = "ClickUpgradeLevel_";
-
     void Awake()
     {
         if (Instance == null)
@@ -41,9 +39,8 @@ public class ClickUpgradeManager : MonoBehaviour
             return;
         }
 
-        // Initialize the dictionary immediately
+        // Initialize the dictionary immediately, levels will be loaded later
         InitializeClickUpgradeStates();
-        // Note: Loading happens via SaveLoadManager calling LoadClickUpgrades
     }
 
     /// <summary>
@@ -76,7 +73,7 @@ public class ClickUpgradeManager : MonoBehaviour
                 Debug.LogWarning($"Duplicate ClickUpgradeData {clickData.name} detected in list. Skipping.");
             }
         }
-        // Recalculate bonus based on initial (likely level 0) state
+        // Recalculate bonus based on initial (level 0) state
         RecalculateTotalClickBonus();
     }
 
@@ -188,54 +185,90 @@ public class ClickUpgradeManager : MonoBehaviour
         }
     }
 
-    // --- Save/Load --- 
-    public void SaveClickUpgrades()
-    {
-        foreach (var kvp in playerClickUpgradesState)
-        {
-            if (kvp.Key != null)
-            {
-                string key = ClickUpgradeLevelKeyPrefix + kvp.Key.name; // Use name for uniqueness
-                PlayerPrefs.SetInt(key, kvp.Value.level);
-                // Debug.Log($"Saving Click Upgrade: Key={key}, Level={kvp.Value.level}");
-            }
-        }
-    }
+    // --- Save/Load (Refactored) ---
 
-    public void LoadClickUpgrades()
+    // NEW: Loads click upgrade levels from the SaveData object.
+    public void LoadData(SaveData saveData)
     {
-        bool needsRecalculate = false;
-        Debug.Log("LoadClickUpgrades: Starting...");
-        foreach (var kvp in playerClickUpgradesState)
+        if (saveData == null || saveData.clickUpgradeLevels == null)
         {
-            if (kvp.Key != null)
+            Debug.Log("ClickUpgradeManager: No save data for click upgrades, using initial levels (0).");
+            // Ensure default state is level 0 (already done in InitializeClickUpgradeStates)
+            RecalculateTotalClickBonus();
+            return;
+        }
+
+        bool needsRecalculate = false;
+        Debug.Log("ClickUpgradeManager: Loading click upgrade levels...");
+
+        // Create a lookup from the available data list for efficiency
+        var availableDataLookup = availableClickUpgradesData.Where(d => d != null).ToDictionary(d => d.name);
+
+        foreach (var savedUpgrade in saveData.clickUpgradeLevels)
+        {
+            // Find the corresponding ScriptableObject using the saved name
+            if (availableDataLookup.TryGetValue(savedUpgrade.upgradeName, out ClickUpgradeData dataSO))
             {
-                string key = ClickUpgradeLevelKeyPrefix + kvp.Key.name;
-                int loadedLevel = PlayerPrefs.GetInt(key, 0); // Default to 0 if not found
-                if (kvp.Value.level != loadedLevel)
+                // Find the corresponding runtime state object
+                if (playerClickUpgradesState.TryGetValue(dataSO, out UpgradeState state))
                 {
-                    // Debug.Log($"Loading Click Upgrade: Key={key}, Found Level={loadedLevel}, Updating State for {kvp.Key.name}");
-                    kvp.Value.level = loadedLevel;
-                    needsRecalculate = true;
-                    OnClickUpgradeStateChanged?.Invoke(kvp.Value); // Notify UI of loaded level
+                    if (state.level != savedUpgrade.level)
+                    {
+                        state.level = savedUpgrade.level;
+                        needsRecalculate = true;
+                        OnClickUpgradeStateChanged?.Invoke(state); // Notify UI
+                         // Debug.Log($"Loaded click upgrade '{savedUpgrade.upgradeName}' level {savedUpgrade.level}.");
+                    }
                 }
+                else
+                {
+                     Debug.LogWarning($"ClickUpgradeManager: Runtime state not found for loaded upgrade '{savedUpgrade.upgradeName}', even though ScriptableObject exists. Skipping.");
+                }
+            }
+            else
+            {
+                 Debug.LogWarning($"ClickUpgradeManager: ScriptableObject named '{savedUpgrade.upgradeName}' not found in availableClickUpgradesData. Skipping load for this upgrade.");
             }
         }
 
         if (needsRecalculate)
         {
-            Debug.Log("LoadClickUpgrades: Levels loaded, recalculating total bonus...");
-            RecalculateTotalClickBonus(); // Recalculate if any levels were loaded
+            Debug.Log("ClickUpgradeManager: Levels loaded, recalculating total bonus...");
+            RecalculateTotalClickBonus();
         }
         else
         {
-            Debug.Log("LoadClickUpgrades: No changes in loaded levels detected.");
+            Debug.Log("ClickUpgradeManager: No changes in loaded click upgrade levels detected.");
         }
     }
 
-    public void ResetClickUpgrades()
+    // NEW: Provides click upgrade data for saving.
+    public List<UpgradeSaveData> GetData()
+    {
+        List<UpgradeSaveData> dataToSave = new List<UpgradeSaveData>();
+        foreach (var kvp in playerClickUpgradesState)
+        {
+            if (kvp.Key != null && kvp.Value.level > 0) // Only save upgrades with level > 0
+            {
+                dataToSave.Add(new UpgradeSaveData
+                {
+                    upgradeName = kvp.Key.name, // Use ScriptableObject name as ID
+                    level = kvp.Value.level
+                });
+            }
+        }
+        return dataToSave;
+    }
+
+    // CHANGED: Renamed from ResetClickUpgrades, now only resets runtime state.
+    /// <summary>
+    /// Resets all click upgrade levels to 0 in memory.
+    /// Does not affect saved files directly.
+    /// </summary>
+    public void ResetData()
     {
         bool changed = false;
+        Debug.Log("ClickUpgradeManager: Resetting runtime click upgrade levels...");
         foreach (var state in playerClickUpgradesState.Values)
         {
             if (state.level != 0)
@@ -244,22 +277,13 @@ public class ClickUpgradeManager : MonoBehaviour
                 OnClickUpgradeStateChanged?.Invoke(state); // Notify UI of reset
                 changed = true;
             }
-            // Delete the specific key using the correct property name
-            if (state.upgradeDataRef != null) // Use upgradeDataRef
-            {
-                 string key = ClickUpgradeLevelKeyPrefix + state.upgradeDataRef.name;
-                 PlayerPrefs.DeleteKey(key);
-            }
-            else
-            {
-                // This case is less likely if initialization is correct, but good to handle
-                Debug.LogWarning("UpgradeState found with null upgradeDataRef during reset.");
-            }
+             // REMOVED: PlayerPrefs key deletion
         }
 
         if (changed)
         {
-            RecalculateTotalClickBonus(); // Recalculate bonus (will likely reset to base)
+            RecalculateTotalClickBonus(); // Recalculate bonus (will go back to base)
+             Debug.Log("ClickUpgradeManager: Runtime levels reset.");
         }
     }
 } 

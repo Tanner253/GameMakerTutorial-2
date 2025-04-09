@@ -18,8 +18,6 @@ public class ProductionManager : MonoBehaviour
     // Runtime state of PRODUCTION upgrades the player owns or can purchase
     private List<UpgradeState> playerProductionUpgrades;
 
-    private const string ProdUpgradeLevelKeyPrefix = "ProdUpgradeLevel_";
-
     /// <summary>
     /// Fired when a production upgrade's state changes (e.g., purchased).
     /// Passes the updated UpgradeState.
@@ -44,7 +42,7 @@ public class ProductionManager : MonoBehaviour
             return;
         }
 
-        InitializePlayerUpgrades();
+        InitializePlayerUpgradesList();
     }
 
     void Update()
@@ -93,22 +91,32 @@ public class ProductionManager : MonoBehaviour
         }
     }
 
-    void InitializePlayerUpgrades()
+    void InitializePlayerUpgradesList()
     {
         playerProductionUpgrades = new List<UpgradeState>();
-        bool anyLoaded = false;
+        if (availableUpgradesData == null) {
+             Debug.LogError("Available Production Upgrades Data is not assigned in ProductionManager!");
+             availableUpgradesData = new List<ProductionUpgradeData>(); // Prevent null errors
+             return;
+         }
+
         foreach (var upgradeData in availableUpgradesData)
         {
             if (upgradeData != null)
             {
+                // Check for duplicates based on the ScriptableObject reference itself
+                 if (playerProductionUpgrades.Any(state => state.upgradeDataRef == upgradeData))
+                 {
+                     Debug.LogWarning($"Duplicate ProductionUpgradeData {upgradeData.name} detected in available list. Skipping.");
+                     continue;
+                 }
+
                 // Create an UpgradeState instance specifically for this production upgrade data
-                UpgradeState newState = new UpgradeState(upgradeData);
-
-                // Load the saved level for this upgrade
-                string key = ProdUpgradeLevelKeyPrefix + upgradeData.name; // Use upgrade name as part of the key
-                newState.level = PlayerPrefs.GetInt(key, 0); // Default to 0 if not found
-                if (newState.level > 0) anyLoaded = true;
-
+                UpgradeState newState = new UpgradeState(upgradeData)
+                {
+                    level = 0, // Start at level 0
+                    productionTimer = 0f // Initialize timer
+                };
                 playerProductionUpgrades.Add(newState);
             }
             else
@@ -116,12 +124,7 @@ public class ProductionManager : MonoBehaviour
                 Debug.LogWarning("Null ProductionUpgradeData found in availableUpgradesData list.");
             }
         }
-        if (anyLoaded) Debug.Log("Production upgrade levels loaded during initialization.");
-        // Note: No recalculation needed here as production is calculated per-frame in Update
-        // UI updates are handled by OnProductionUpgradeStateChanged event when levels actually change (purchase)
-        // Initial UI population should read the loaded state.
-
-        // Calculate initial rate based on loaded levels and notify listeners
+        // Calculate initial rate (will be 0) and notify listeners
         UpdateTotalRateAndNotify();
     }
 
@@ -159,78 +162,112 @@ public class ProductionManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Loads production upgrade levels from PlayerPrefs.
-    /// Called by SaveLoadManager.
+    /// Loads production upgrade levels from the SaveData object.
     /// </summary>
-    public void LoadProductionUpgrades()
+    public void LoadData(SaveData saveData)
     {
+        if (saveData == null || saveData.productionUpgradeLevels == null)
+        {
+            Debug.Log("ProductionManager: No save data for production upgrades, using initial levels (0).");
+            // Ensure default state is level 0 (already done in InitializePlayerUpgradesList)
+            UpdateTotalRateAndNotify();
+            return;
+        }
+
         Debug.Log("ProductionManager: Loading production upgrade levels...");
-        bool anyLoaded = false;
         bool stateChanged = false;
+
+        // Create a lookup from the available data list for efficiency
+        var availableDataLookup = availableUpgradesData.Where(d => d != null).ToDictionary(d => d.name);
+        // Create a lookup for the runtime states
+        var runtimeStateLookup = playerProductionUpgrades.Where(s => s.upgradeDataRef != null).ToDictionary(s => s.upgradeDataRef.name);
+
+        foreach (var savedUpgrade in saveData.productionUpgradeLevels)
+        {
+             // Find the corresponding runtime state object using the saved name
+             if (runtimeStateLookup.TryGetValue(savedUpgrade.upgradeName, out UpgradeState state))
+             {
+                  if (state.level != savedUpgrade.level)
+                 {
+                     state.level = savedUpgrade.level;
+                     state.productionTimer = 0f; // Reset timer on load
+                     OnProductionUpgradeStateChanged?.Invoke(state); // Notify UI
+                     stateChanged = true;
+                     // Debug.Log($"Loaded production upgrade '{savedUpgrade.upgradeName}' level {savedUpgrade.level}.");
+                 }
+             }
+             else
+             {
+                 // This implies an upgrade was saved that isn't in the current availableUpgradesData list
+                 // or the runtime state wasn't initialized correctly.
+                 Debug.LogWarning($"ProductionManager: Runtime state or ScriptableObject for saved upgrade '{savedUpgrade.upgradeName}' not found. Skipping load for this upgrade.");
+             }
+        }
+
+        if (stateChanged)
+        {
+            Debug.Log("ProductionManager: Levels loaded.");
+            UpdateTotalRateAndNotify(); // Recalculate total rate if levels changed
+        }
+        else
+        {
+             Debug.Log("ProductionManager: No changes in loaded production upgrade levels detected.");
+        }
+    }
+
+    /// <summary>
+    /// Provides production upgrade data for saving.
+    /// </summary>
+    public List<UpgradeSaveData> GetData()
+    {
+        List<UpgradeSaveData> dataToSave = new List<UpgradeSaveData>();
         foreach (var upgradeState in playerProductionUpgrades)
         {
-            if (upgradeState.upgradeDataRef != null && upgradeState.upgradeDataRef is ProductionUpgradeData prodData)
+            // Check if the reference is valid and level is > 0
+            if (upgradeState.upgradeDataRef != null && upgradeState.level > 0)
             {
-                string key = ProdUpgradeLevelKeyPrefix + prodData.name;
-                int loadedLevel = PlayerPrefs.GetInt(key, 0);
-                if (upgradeState.level != loadedLevel)
+                dataToSave.Add(new UpgradeSaveData
                 {
-                    upgradeState.level = loadedLevel;
-                    upgradeState.productionTimer = 0f; // Reset timer on load
-                    OnProductionUpgradeStateChanged?.Invoke(upgradeState); // Notify UI
-                    anyLoaded = true;
-                    stateChanged = true;
-                }
+                    upgradeName = upgradeState.upgradeDataRef.name, // Use SO name as ID
+                    level = upgradeState.level
+                });
             }
         }
-
-        if (anyLoaded) Debug.Log("ProductionManager: Levels loaded.");
-        if (stateChanged) UpdateTotalRateAndNotify(); // Recalculate total rate if levels changed
+        return dataToSave;
     }
 
     /// <summary>
-    /// Saves production upgrade levels to PlayerPrefs.
-    /// This method itself is called by SaveLoadManager.
+    /// Resets all production upgrade levels to 0 in memory and resets timers.
+    /// Does not affect saved files directly.
     /// </summary>
-    public void SaveProductionUpgrades()
+    public void ResetData()
     {
-        foreach (var upgradeState in playerProductionUpgrades)
-        {
-            if (upgradeState.upgradeDataRef != null && upgradeState.upgradeDataRef is ProductionUpgradeData prodData)
-            {
-                string key = ProdUpgradeLevelKeyPrefix + prodData.name;
-                PlayerPrefs.SetInt(key, upgradeState.level);
-                // Debug.Log($"Saving Prod Upgrade: Key={key}, Level={upgradeState.level}");
-            }
-        }
-        // PlayerPrefs.Save() is called by SaveLoadManager after all saving is done.
-    }
-
-    /// <summary>
-    /// Resets the runtime state AND saved data for production upgrades.
-    /// Called by SaveLoadManager during the reset process.
-    /// </summary>
-    public void ResetProductionUpgrades()
-    {
-        Debug.Log("ProductionManager: Resetting production upgrades...");
+        Debug.Log("ProductionManager: Resetting runtime production upgrades...");
         bool stateChanged = false;
         foreach (var upgradeState in playerProductionUpgrades)
         {
             if (upgradeState.level != 0)
             {
                 upgradeState.level = 0;
-                upgradeState.productionTimer = 0f; // Reset timer too
-                OnProductionUpgradeStateChanged?.Invoke(upgradeState);
                 stateChanged = true;
             }
-            // Delete the specific key
-            if (upgradeState.upgradeDataRef != null)
-            {
-                string key = ProdUpgradeLevelKeyPrefix + upgradeState.upgradeDataRef.name;
-                PlayerPrefs.DeleteKey(key);
-            }
+            // Always reset timer on reset
+            upgradeState.productionTimer = 0f;
+
+            // Notify UI about the reset state for this upgrade
+            OnProductionUpgradeStateChanged?.Invoke(upgradeState);
+
+            // REMOVED: PlayerPrefs key deletion
         }
-        if (stateChanged) Debug.Log("ProductionManager: Runtime levels reset and PlayerPrefs keys deleted.");
+
+        if (stateChanged)
+        {
+            Debug.Log("ProductionManager: Runtime levels reset.");
+        }
+        else
+        {
+            Debug.Log("ProductionManager: Runtime levels were already 0.");
+        }
 
         UpdateTotalRateAndNotify(); // Update total rate (will be 0)
     }
@@ -242,56 +279,43 @@ public class ProductionManager : MonoBehaviour
     /// <returns>The UpgradeState or null if not found.</returns>
     public UpgradeState GetPlayerUpgradeState(ProductionUpgradeData data)
     {
+        // Find the state where the upgradeDataRef matches the passed-in ScriptableObject
         return playerProductionUpgrades.FirstOrDefault(upgState => upgState.upgradeDataRef == data);
     }
 
     /// <summary>
     /// Calculates the cost for the next level of a given production upgrade.
+    /// Assumes GameManager exists for global scale.
     /// </summary>
     public decimal CalculateUpgradeCost(ProductionUpgradeData data, int currentLevel)
     {
+        if (data == null) return decimal.MaxValue;
         if (currentLevel < 0) currentLevel = 0;
 
-        // Cost formula: baseCost * (costScaleFactor ^ level) * globalScale
-        decimal globalScale = (decimal)GameManager.Instance.globalProgressionScale;
-        // Cast float baseCost to decimal for calculation
-        decimal cost = (decimal)data.baseCost * (decimal)Mathf.Pow(data.costScaleFactor, currentLevel) * globalScale;
+        float globalScaleFloat = GameManager.Instance != null ? GameManager.Instance.globalProgressionScale : 1.0f;
+        decimal globalScale = (decimal)globalScaleFloat;
 
-        return Math.Ceiling(cost); // Round up to nearest whole number
+        decimal cost = (decimal)data.baseCost * (decimal)Mathf.Pow(data.costScaleFactor, currentLevel) * globalScale;
+        return Math.Ceiling(cost);
     }
 
     /// <summary>
-    /// Attempts to purchase the next level of a production upgrade.
+    /// Applies a successfully purchased production upgrade.
+    /// Increments level, updates total rate, and notifies listeners.
     /// </summary>
-    /// <param name="dataToPurchase">The ProductionUpgradeData asset to purchase.</param>
-    /// <returns>True if purchase was successful, false otherwise.</returns>
-    public bool TryPurchaseUpgrade(ProductionUpgradeData dataToPurchase)
+    public void ApplyUpgrade(ProductionUpgradeData data)
     {
-        UpgradeState upgradeState = GetPlayerUpgradeState(dataToPurchase);
-        if (upgradeState == null)
+        UpgradeState state = GetPlayerUpgradeState(data);
+        if (state != null)
         {
-            Debug.LogError($"Upgrade data '{dataToPurchase.upgradeName}' not found in player production upgrades list.");
-            return false;
-        }
-
-        decimal cost = CalculateUpgradeCost(dataToPurchase, upgradeState.level);
-        // Use ScoreManager's central purchase logic
-        if (ScoreManager.Instance != null && ScoreManager.Instance.TrySpendScore(cost))
-        {
-            upgradeState.level++;
-            upgradeState.productionTimer = 0f; // Reset timer on purchase for fairness
-            OnProductionUpgradeStateChanged?.Invoke(upgradeState); // Notify listeners (UI)
-            Debug.Log($"Purchased '{dataToPurchase.upgradeName}' level {upgradeState.level} for {cost:F0}.");
-
-            // After successfully changing level, update total rate
-            UpdateTotalRateAndNotify();
-            return true;
+            state.level++;
+            OnProductionUpgradeStateChanged?.Invoke(state); // Notify UI FIRST
+            UpdateTotalRateAndNotify(); // THEN update the total rate
+            // Debug.Log($"Applied production upgrade '{data.upgradeName}' level {state.level}.");
         }
         else
         {
-            Debug.Log($"Not enough score ({ScoreManager.Instance.GetCurrentScore():F1}) to purchase '{dataToPurchase.upgradeName}' level {upgradeState.level + 1} costing {cost:F0}");
+            Debug.LogError($"Could not find state for ProductionUpgradeData: {data.name} during ApplyUpgrade.");
         }
-
-        return false;
     }
 } 

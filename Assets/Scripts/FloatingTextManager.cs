@@ -1,6 +1,8 @@
 using UnityEngine;
 using TMPro;
 using System.Collections;
+using UnityEngine.Pool; // Added for Object Pooling
+using System.Collections.Generic; // Added for tracking active coroutines
 
 public class FloatingTextManager : MonoBehaviour
 {
@@ -15,8 +17,76 @@ public class FloatingTextManager : MonoBehaviour
     [Tooltip("Set the font size for the feedback text.")]
     public float feedbackFontSize = 36f; // Added font size control
 
-    // Method to be called by other scripts (like GameManager)
-    // Overload 1: Default color (from prefab)
+    [Header("Pooling Settings")]
+    public int defaultCapacity = 10;
+    public int maxPoolSize = 50;
+
+    // Object Pool for the floating text instances
+    private IObjectPool<GameObject> _floatingTextPool;
+
+    // Track active coroutines to stop them if the object is released prematurely
+    private Dictionary<GameObject, Coroutine> _activeCoroutines = new Dictionary<GameObject, Coroutine>();
+
+    void Awake()
+    {
+        // Initialize the pool
+        _floatingTextPool = new ObjectPool<GameObject>(
+            CreatePooledItem,
+            OnTakeFromPool,
+            OnReturnedToPool,
+            OnDestroyPoolObject,
+            true, // Collection check (optional, for safety)
+            defaultCapacity,
+            maxPoolSize
+        );
+    }
+
+    // --- Object Pool Methods ---
+
+    private GameObject CreatePooledItem()
+    {
+        if (floatingTextPrefab == null)
+        {
+            Debug.LogError("Floating Text Prefab is not assigned! Cannot create pooled item.");
+            return null;
+        }
+        GameObject instance = Instantiate(floatingTextPrefab, textSpawnParent);
+        instance.SetActive(false); // Start inactive
+        return instance;
+    }
+
+    // Called when an item is taken from the pool
+    private void OnTakeFromPool(GameObject instance)
+    {
+        instance.SetActive(true);
+        // Reset any state if needed (e.g., position is set in ShowFloatingText, color/alpha reset in coroutine)
+    }
+
+    // Called when an item is returned to the pool
+    private void OnReturnedToPool(GameObject instance)
+    {
+        // Stop any associated coroutine if it's still running
+        if (_activeCoroutines.TryGetValue(instance, out Coroutine coroutine))
+        {
+            if (coroutine != null)
+            {
+                StopCoroutine(coroutine);
+            }
+            _activeCoroutines.Remove(instance);
+        }
+        instance.SetActive(false);
+    }
+
+    // Called when an item is destroyed (e.g., if pool exceeds max size)
+    private void OnDestroyPoolObject(GameObject instance)
+    {
+        Destroy(instance);
+        // No need to remove from _activeCoroutines here, as Destroy handles it
+    }
+
+    // --- Show Floating Text Logic (Modified for Pooling) ---
+
+    // Overload 1: Default color
     public void ShowFloatingText(decimal value, Vector2 sourceAnchoredPosition)
     {
         ShowFloatingText(value, sourceAnchoredPosition, null);
@@ -31,68 +101,74 @@ public class FloatingTextManager : MonoBehaviour
             return;
         }
 
-        // Instantiate the prefab under the specified parent
-        GameObject textInstance = Instantiate(floatingTextPrefab, textSpawnParent);
+        // Get an instance from the pool instead of instantiating
+        GameObject textInstance = _floatingTextPool.Get();
+        if (textInstance == null) return; // Pool failed to provide an instance
+
         RectTransform textRectTransform = textInstance.GetComponent<RectTransform>();
+        TextMeshProUGUI textMesh = textInstance.GetComponentInChildren<TextMeshProUGUI>(); // Assume prefab structure is correct
 
-        if (textRectTransform != null)
+        if (textRectTransform == null || textMesh == null)
         {
-            // Calculate random offset
-            float randomX = Random.Range(-randomXRange / 2f, randomXRange / 2f);
-            float randomY = Random.Range(-randomYRange / 2f, randomYRange / 2f);
-            Vector2 randomOffset = new Vector2(randomX, randomY);
-
-            // Set initial position relative to the source's anchored position + base offset + random offset
-            textRectTransform.anchoredPosition = sourceAnchoredPosition + new Vector2(baseSpawnOffset.x, baseSpawnOffset.y) + randomOffset;
-        }
-        else
-        {
-            Debug.LogError("Floating Text Prefab needs a RectTransform!");
-            Destroy(textInstance);
+            Debug.LogError("Pooled Floating Text Prefab is missing RectTransform or TextMeshProUGUI! Returning to pool.");
+            _floatingTextPool.Release(textInstance);
             return;
         }
 
-        // Get the TextMeshPro component
-        TextMeshProUGUI textMesh = textInstance.GetComponentInChildren<TextMeshProUGUI>();
-        if (textMesh != null)
+        // Calculate random offset
+        float randomX = Random.Range(-randomXRange / 2f, randomXRange / 2f);
+        float randomY = Random.Range(-randomYRange / 2f, randomYRange / 2f);
+        Vector2 randomOffset = new Vector2(randomX, randomY);
+
+        // Set initial position
+        textRectTransform.anchoredPosition = sourceAnchoredPosition + new Vector2(baseSpawnOffset.x, baseSpawnOffset.y) + randomOffset;
+
+        // Set text content and appearance
+        textMesh.text = NumberFormatter.FormatNumber(value, true);
+        textMesh.fontSize = feedbackFontSize;
+
+        // Determine initial color
+        Color startColor;
+        if (textColor.HasValue)
         {
-            // Format decimal value
-            textMesh.text = $"+{value:F1}";
-
-            // Set the font size
-            textMesh.fontSize = feedbackFontSize;
-
-            // Set color if provided, otherwise use prefab's default
-            if (textColor.HasValue)
-            {
-                textMesh.color = textColor.Value;
-            }
-
-            // Start the animation coroutine, passing the RectTransform and the *initial* color
-            // The coroutine will handle fading from this initial color.
-            StartCoroutine(FloatAndFadeText(textInstance, textRectTransform, textMesh, textMesh.color));
+            // Use the provided color
+            startColor = textColor.Value;
         }
         else
         {
-            Debug.LogError("Floating Text Prefab needs a TextMeshProUGUI component!");
-            Destroy(textInstance); // Clean up useless instance
+            // No color provided (e.g., manual click), explicitly use white
+            startColor = Color.white;
         }
+        // Apply the determined color immediately (alpha will be set in coroutine)
+        textMesh.color = startColor;
+
+        // Start the animation coroutine
+        Coroutine animationCoroutine = StartCoroutine(FloatAndFadeText(textInstance, textRectTransform, textMesh, startColor));
+        _activeCoroutines[textInstance] = animationCoroutine; // Track the coroutine
+
     }
 
-    // Coroutine to handle floating and fading
-    // Now takes the starting color as an argument
+    // --- Coroutine (Modified for Pooling) ---
+
     IEnumerator FloatAndFadeText(GameObject instance, RectTransform rectTransform, TextMeshProUGUI textMesh, Color startColor)
     {
         float timer = 0f;
+        // Ensure starting alpha is correct (might have been faded out when returned to pool)
+        textMesh.color = new Color(startColor.r, startColor.g, startColor.b, 1f);
 
         while (timer < floatDuration)
         {
-            if (instance == null || rectTransform == null) yield break; // Stop if object was destroyed early
+            // Check instance validity (might be released prematurely)
+            if (instance == null || !instance.activeInHierarchy)
+            {
+                 _activeCoroutines.Remove(instance);
+                 yield break; // Stop if object was returned to pool early
+            }
 
             // Move up using anchoredPosition
             rectTransform.anchoredPosition += Vector2.up * floatSpeed * Time.deltaTime;
 
-            // Fade out (calculate alpha based on remaining time)
+            // Fade out
             float alpha = Mathf.Lerp(1f, 0f, timer / floatDuration);
             textMesh.color = new Color(startColor.r, startColor.g, startColor.b, alpha);
 
@@ -100,19 +176,19 @@ public class FloatingTextManager : MonoBehaviour
             yield return null; // Wait for the next frame
         }
 
-        // Ensure it's fully destroyed after the loop
-        if (instance != null) Destroy(instance);
+        // Release the instance back to the pool instead of destroying
+        _activeCoroutines.Remove(instance); // Stop tracking before release
+        if (instance.activeInHierarchy) // Only release if not already released
+        {
+             _floatingTextPool.Release(instance);
+        }
+
     }
 
-    // Start is called before the first frame update
-    void Start()
+    // --- Cleanup --- 
+    void OnDestroy()
     {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
+        // Dispose of the pool and destroy any remaining active instances
+         _floatingTextPool?.Clear(); // Destroys pooled objects using OnDestroyPoolObject
     }
 } 

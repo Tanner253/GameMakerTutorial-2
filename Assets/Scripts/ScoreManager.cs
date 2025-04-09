@@ -16,8 +16,6 @@ public class ScoreManager : MonoBehaviour
     private decimal currentScore = 0.0M;
     public event Action<decimal> OnScoreChanged;
 
-    private const string ScoreKey = "CurrentScore";
-
     void Awake()
     {
         if (Instance == null)
@@ -40,10 +38,33 @@ public class ScoreManager : MonoBehaviour
         OnScoreChanged -= UpdateScoreDisplay;
     }
 
-    public void Initialize(decimal startingScore)
+    /// <summary>
+    /// Loads the score from the provided SaveData object.
+    /// If SaveData is null or score parsing fails, initializes to 0.
+    /// </summary>
+    public void LoadData(SaveData saveData)
     {
-        currentScore = startingScore;
-        OnScoreChanged?.Invoke(currentScore); // Update UI with initial value
+        decimal loadedScore = 0.0M;
+        if (saveData != null)
+        {
+            // Try parse the score string using InvariantCulture for consistency
+            if (decimal.TryParse(saveData.currentScore, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal parsedScore))
+            {
+                loadedScore = parsedScore;
+                // Debug.Log($"ScoreManager: Loaded score {loadedScore} from SaveData.");
+            }
+            else
+            {
+                 Debug.LogWarning($"ScoreManager: Could not parse score '{saveData.currentScore}' from SaveData. Defaulting to 0.");
+            }
+        }
+        else
+        {
+             Debug.Log("ScoreManager: No SaveData provided, initializing score to 0.");
+        }
+
+        currentScore = loadedScore;
+        OnScoreChanged?.Invoke(currentScore); // Update UI with initial/loaded value
     }
 
     public decimal GetCurrentScore()
@@ -97,56 +118,33 @@ public class ScoreManager : MonoBehaviour
         return false;
     }
 
-    // --- Save/Load ---
-    public void SaveScore()
+    // --- Save/Load (Refactored) ---
+
+    // NEW: Returns the current score as a string for serialization.
+    public string GetData()
     {
-        PlayerPrefs.SetString(ScoreKey, currentScore.ToString(CultureInfo.InvariantCulture));
+        return currentScore.ToString(CultureInfo.InvariantCulture);
     }
 
-    public decimal LoadScore()
-    {
-        string savedScoreString = PlayerPrefs.GetString(ScoreKey, "0");
-        if (
-            decimal.TryParse(
-                savedScoreString,
-                NumberStyles.Any,
-                CultureInfo.InvariantCulture,
-                out decimal loadedScore
-            )
-        )
-        {
-            return loadedScore;
-        }
-        return 0.0M;
-    }
-
-    public void ResetScore()
+    /// <summary>
+    /// Resets the current score to 0 in memory.
+    /// Does not affect saved files directly (SaveLoadManager handles file deletion).
+    /// </summary>
+    public void ResetData()
     {
         currentScore = 0.0M;
-        PlayerPrefs.DeleteKey(ScoreKey);
-        OnScoreChanged?.Invoke(currentScore);
+        // REMOVED: PlayerPrefs.DeleteKey(ScoreKey);
+        OnScoreChanged?.Invoke(currentScore); // Update UI
+        Debug.Log("ScoreManager: Runtime score reset to 0.");
     }
 
     // --- UI Update ---
     void UpdateScoreDisplay(decimal newScore)
     {
-        string formattedScore = FormatScore(newScore);
+        string formattedScore = NumberFormatter.FormatNumber(newScore);
         if (balanceText != null)
         {
             balanceText.text = $"Balance: {formattedScore}";
         }
-    }
-
-    string FormatScore(decimal score)
-    {
-        // Basic formatting, can be expanded (e.g., K, M, B)
-        // Consider creating a dedicated NumberFormatter utility class if formatting gets complex
-        if (score >= 1000000000)
-            return (score / 1000000000M).ToString("0.##B");
-        if (score >= 1000000)
-            return (score / 1000000M).ToString("0.##M");
-        if (score >= 1000)
-            return (score / 1000M).ToString("0.##K");
-        return score.ToString("F0");
     }
 }

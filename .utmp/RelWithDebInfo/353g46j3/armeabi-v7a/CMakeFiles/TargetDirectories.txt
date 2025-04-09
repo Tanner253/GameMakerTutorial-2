@@ -1,0 +1,8 @@
+C:/Users/perci/source/repos/Unity/GameMakerTutorial-2/CookieClicker/.utmp/RelWithDebInfo/353g46j3/armeabi-v7a/CMakeFiles/edit_cache.dir
+C:/Users/perci/source/repos/Unity/GameMakerTutorial-2/CookieClicker/.utmp/RelWithDebInfo/353g46j3/armeabi-v7a/CMakeFiles/rebuild_cache.dir
+C:/Users/perci/source/repos/Unity/GameMakerTutorial-2/CookieClicker/.utmp/RelWithDebInfo/353g46j3/armeabi-v7a/GameActivity/CMakeFiles/game.dir
+C:/Users/perci/source/repos/Unity/GameMakerTutorial-2/CookieClicker/.utmp/RelWithDebInfo/353g46j3/armeabi-v7a/GameActivity/CMakeFiles/edit_cache.dir
+C:/Users/perci/source/repos/Unity/GameMakerTutorial-2/CookieClicker/.utmp/RelWithDebInfo/353g46j3/armeabi-v7a/GameActivity/CMakeFiles/rebuild_cache.dir
+C:/Users/perci/source/repos/Unity/GameMakerTutorial-2/CookieClicker/.utmp/RelWithDebInfo/353g46j3/armeabi-v7a/FramePacing/CMakeFiles/swappywrapper.dir
+C:/Users/perci/source/repos/Unity/GameMakerTutorial-2/CookieClicker/.utmp/RelWithDebInfo/353g46j3/armeabi-v7a/FramePacing/CMakeFiles/edit_cache.dir
+C:/Users/perci/source/repos/Unity/GameMakerTutorial-2/CookieClicker/.utmp/RelWithDebInfo/353g46j3/armeabi-v7a/FramePacing/CMakeFiles/rebuild_cache.dir

@@ -10,19 +10,26 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
 {
     // References for UI and Animation
     public TextMeshProUGUI counterText;
-    public Button clickButton; // Optional: Can be removed if IPointerClickHandler is sufficient
-    public Animator coinAnimator;
+    // REMOVED: Unused optional Button reference
+    // public Button clickButton;
 
     private RectTransform rectTransform; // Store RectTransform for position
+    private Vector3 originalScale; // Store the original scale
+    private Coroutine clickAnimationCoroutine; // To manage the animation coroutine
 
-    // Define constants for number thresholds (using decimal for precision)
-    private static readonly decimal CryptonThreshold = 1_000_000_000_000_000_000_000_000m;
-    private static readonly decimal SextillionThreshold = 1_000_000_000_000_000_000_000m;
-    private static readonly decimal QuintillionThreshold = 1_000_000_000_000_000_000m;
-    private static readonly decimal QuadrillionThreshold = 1_000_000_000_000_000m;
-    private static readonly decimal TrillionThreshold = 1_000_000_000_000m;
-    private static readonly decimal BillionThreshold = 1_000_000_000m;
-    private static readonly decimal MillionThreshold = 1_000_000m;
+    // Animation parameters
+    private float animationDuration = 0.1f; // Duration of scale down/up
+    private float scaleDownFactor = 0.9f; // How much to scale down
+
+    // REMOVED Number formatting constants - Moved to NumberFormatter utility
+    // // Define constants for number thresholds (using decimal for precision)
+    // private static readonly decimal GoldThreshold = 1_000_000_000_000_000_000_000_000m;
+    // private static readonly decimal SextillionThreshold = 1_000_000_000_000_000_000_000m;
+    // private static readonly decimal QuintillionThreshold = 1_000_000_000_000_000_000m;
+    // private static readonly decimal QuadrillionThreshold = 1_000_000_000_000_000m;
+    // private static readonly decimal TrillionThreshold = 1_000_000_000_000m;
+    // private static readonly decimal BillionThreshold = 1_000_000_000m;
+    // private static readonly decimal MillionThreshold = 1_000_000m;
 
     void Awake()
     {
@@ -30,6 +37,10 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
         if (rectTransform == null)
         {
             Debug.LogError("ButtonCounter requires a RectTransform component!", this);
+        }
+        else
+        {
+             originalScale = rectTransform.localScale; // Store the initial scale
         }
     }
 
@@ -49,12 +60,11 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
             );
         }
 
-        // Optional: Add click listener to the button component
-        // Can be removed if direct IPointerClickHandler on the coin is preferred
-        if (clickButton != null)
-        {
-            clickButton.onClick.AddListener(HandleClick);
-        }
+        // REMOVED: Optional Button listener logic - Not used
+        // if (clickButton != null)
+        // {
+        //     clickButton.onClick.AddListener(HandleClick);
+        // }
     }
 
     void OnDestroy()
@@ -69,6 +79,8 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
     // Called by Unity's Event System when the GameObject is clicked
     public void OnPointerClick(PointerEventData eventData)
     {
+        Debug.Log($"OnPointerClick received at {Time.time} for object {eventData.pointerCurrentRaycast.gameObject?.name ?? "None"}");
+
         // Check if the object clicked is NOT this specific coin GameObject.
         // If the click hit a different UI element (like the upgrade panel background),
         // ignore the click for the coin.
@@ -97,19 +109,40 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
             return; // Don't proceed if we can't notify GameManager
         }
 
-        // Trigger the coin's visual animation (remains local responsibility)
-        if (coinAnimator != null)
+        // Start the click animation coroutine
+        if (clickAnimationCoroutine != null)
         {
-            AnimatorStateInfo stateInfo = coinAnimator.GetCurrentAnimatorStateInfo(0);
-            if (stateInfo.IsName("Idle")) // Check if idle before triggering
-            {
-                coinAnimator.SetTrigger("Spin");
-            }
+            StopCoroutine(clickAnimationCoroutine); // Stop previous animation if running
         }
-        else
+        clickAnimationCoroutine = StartCoroutine(ClickAnimation());
+    }
+
+    // Coroutine for click animation
+    private IEnumerator ClickAnimation()
+    {
+        Vector3 targetScale = originalScale * scaleDownFactor;
+        float elapsedTime = 0f;
+
+        // Scale down
+        while (elapsedTime < animationDuration / 2)
         {
-            Debug.LogWarning("Coin Animator not assigned in ButtonCounter!", this);
+            rectTransform.localScale = Vector3.Lerp(originalScale, targetScale, (elapsedTime / (animationDuration / 2)));
+            elapsedTime += Time.deltaTime;
+            yield return null;
         }
+        rectTransform.localScale = targetScale; // Ensure final scale down state
+
+        elapsedTime = 0f; // Reset for scale up
+
+        // Scale back up
+        while (elapsedTime < animationDuration / 2)
+        {
+            rectTransform.localScale = Vector3.Lerp(targetScale, originalScale, (elapsedTime / (animationDuration / 2)));
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+        rectTransform.localScale = originalScale; // Ensure final original scale state
+        clickAnimationCoroutine = null; // Reset coroutine reference
     }
 
     // Accept decimal score and format
@@ -117,53 +150,12 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
     {
         if (counterText != null)
         {
-            // Use the new helper method to format the score
-            counterText.text = FormatScore(newScore);
+            // Use the new utility method to format the score
+            counterText.text = NumberFormatter.FormatNumber(newScore);
         }
         else
         {
             Debug.LogWarning("CounterText is not assigned in ButtonCounter!", this);
         }
-    }
-
-    /// <summary>
-    /// Formats the score with commas and abbreviations (M, B, T, Qd, Qt, Sx, C).
-    /// </summary>
-    /// <param name="score">The score to format.</param>
-    /// <returns>Formatted score string.</returns>
-    public static string FormatScore(decimal score)
-    {
-        if (score >= CryptonThreshold)
-        {
-            return $"{(score / SextillionThreshold):F2} C"; // Use Sextillion base for Cryptons
-        }
-        if (score >= SextillionThreshold)
-        {
-            return $"{(score / SextillionThreshold):F2} Sx";
-        }
-        if (score >= QuintillionThreshold)
-        {
-            return $"{(score / QuintillionThreshold):F2} Qt";
-        }
-        if (score >= QuadrillionThreshold)
-        {
-            return $"{(score / QuadrillionThreshold):F2} Qd";
-        }
-        if (score >= TrillionThreshold)
-        {
-            return $"{(score / TrillionThreshold):F2} T";
-        }
-        if (score >= BillionThreshold)
-        {
-            return $"{(score / BillionThreshold):F2} B";
-        }
-        if (score >= MillionThreshold)
-        {
-            return $"{(score / MillionThreshold):F2} M";
-        }
-
-        // Format with commas for numbers less than a million
-        // Use CultureInfo.InvariantCulture to ensure consistent decimal/group separators
-        return score.ToString("N0", CultureInfo.InvariantCulture);
     }
 }
