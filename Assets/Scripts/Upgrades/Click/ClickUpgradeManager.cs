@@ -325,10 +325,32 @@ public class ClickUpgradeManager : MonoBehaviour
     {
         if (saveData == null) return;
 
+        // ADDED NULL CHECK
+        if (playerClickUpgradesState == null)
+        {
+            Debug.LogError("ClickUpgradeManager.UpdateSaveData: playerClickUpgradesState is null! Cannot save click upgrades.");
+            saveData.clickUpgradeLevels = new List<UpgradeSaveData>(); // Ensure list exists even if empty
+            return;
+        }
+
         saveData.clickUpgradeLevels = new List<UpgradeSaveData>();
         foreach (var kvp in playerClickUpgradesState)
         {
-            if (kvp.Key != null && kvp.Value.level > 0)
+            // Check for null Key or Value BEFORE accessing them
+            if (kvp.Key == null)
+            {
+                 Debug.LogError("ClickUpgradeManager.UpdateSaveData: Dictionary contains a null Key! Skipping entry.");
+                 continue;
+            }
+            if (kvp.Value == null)
+            {
+                // Log error only if Key is somehow valid but Value is null
+                Debug.LogError($"ClickUpgradeManager.UpdateSaveData: Dictionary contains a null Value for Key '{kvp.Key.name}'! Skipping entry.");
+                continue;
+            }
+
+            // Now safe to access Key and Value
+            if (kvp.Value.level > 0)
             {
                 saveData.clickUpgradeLevels.Add(new UpgradeSaveData
                 {

@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 using System;
+using UnityEngine.SceneManagement; // NEW: Required for SceneManager
 // Add using for TextMeshPro if you were to add a direct reference here
 
 /// <summary>
@@ -30,6 +31,7 @@ public class ProductionManager : MonoBehaviour
     public event Action<decimal> OnTotalProductionRateChanged;
 
     private PrestigeManager _prestigeManagerInstance; // Cache instance
+    private GameManager _gameManagerInstance; // Cache GameManager
 
     void Awake()
     {
@@ -50,6 +52,8 @@ public class ProductionManager : MonoBehaviour
     void Start() // Use Start for finding other Singletons safely
     {
         _prestigeManagerInstance = PrestigeManager.Instance;
+        _gameManagerInstance = GameManager.Instance; 
+
         if (_prestigeManagerInstance != null)
         {
             _prestigeManagerInstance.OnPrestigeCountChanged += HandlePrestigeCountChanged;
@@ -103,11 +107,43 @@ public class ProductionManager : MonoBehaviour
                     decimal productionPerTick = (decimal)prodData.baseProductionAmount * upgradeState.level;
                     scoreGeneratedThisTick = productionPerTick * ticksOccurred;
 
-                    // Tell ScoreManager to add the score AND show colored feedback
-                    if (ScoreManager.Instance != null)
-                    {
-                        ScoreManager.Instance.AddScoreAndShowFeedback(scoreGeneratedThisTick, prodData.feedbackColor);
+                    // Tell ScoreManager to add the score
+                    ScoreManager.Instance?.AddScore(scoreGeneratedThisTick);
+
+                    // --- Start Floating Text Logic ---
+                    // REMOVED: bool isMainScene = _gameManagerInstance != null && SceneManager.GetActiveScene().buildIndex == _gameManagerInstance.gameObject.scene.buildIndex;
+                    
+                    // REMOVED DEBUG LOG
+                    // Debug.Log($"[ProdManager Tick Check] Upgrade: {prodData.name}, Ticks: {ticksOccurred}, Score: {scoreGeneratedThisTick}, IsMainScene: {isMainScene}");
+                    
+                    // Check if the GameManager exists and necessary components are assigned
+                    if (_gameManagerInstance != null) // Check GameManager first
+                    {                       
+                        bool hasFtm = _gameManagerInstance.floatingTextManager != null;
+                        bool hasRect = _gameManagerInstance.scoreDisplayRectTransform != null;
+                        
+                        // Get FloatingTextManager via GameManager
+                        if (hasFtm && hasRect) // Now check components
+                        {
+                            _gameManagerInstance.floatingTextManager.ShowFloatingText(
+                                scoreGeneratedThisTick,
+                                _gameManagerInstance.scoreDisplayRectTransform.anchoredPosition,
+                                prodData.feedbackColor
+                            );
+                        }
+                        else 
+                        {
+                             // Log specifically why it failed inside the main scene check
+                             if (!hasFtm) Debug.LogError("[ProdManager] Cannot show floating text because GameManager.floatingTextManager reference is MISSING in Inspector!", _gameManagerInstance);
+                             if (!hasRect) Debug.LogError("[ProdManager] Cannot show floating text because GameManager.scoreDisplayRectTransform reference is MISSING in Inspector!", _gameManagerInstance);
+                        }
                     }
+                    // Optional: Log if the scene check failed
+                    // else if (_gameManagerInstance != null) 
+                    // {
+                    //      Debug.LogWarning($"[ProdManager] Scene check failed. Active Scene Index: {SceneManager.GetActiveScene().buildIndex}, GameManager Scene Index: {_gameManagerInstance.gameObject.scene.buildIndex}");
+                    // }
+                    // --- End Floating Text Logic ---
 
                     // Reset timer, retaining the remainder
                     upgradeState.productionTimer -= ticksOccurred * prodData.tickRate;

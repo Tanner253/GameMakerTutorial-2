@@ -8,11 +8,6 @@ public class ScoreManager : MonoBehaviour
 {
     public static ScoreManager Instance { get; private set; }
 
-    [Header("UI References")]
-    public TextMeshProUGUI balanceText;
-    public FloatingTextManager floatingTextManager; // Optional: For showing deductions/additions directly
-    public RectTransform scoreDisplayRectTransform; // Needed for floating text positioning
-
     private decimal currentScore = 0.0M;
     public event Action<decimal> OnScoreChanged;
 
@@ -28,14 +23,10 @@ public class ScoreManager : MonoBehaviour
             Destroy(gameObject);
             return;
         }
-
-        // Subscribe to own event to update UI
-        OnScoreChanged += UpdateScoreDisplay;
     }
 
     void OnDestroy()
     {
-        OnScoreChanged -= UpdateScoreDisplay;
     }
 
     /// <summary>
@@ -88,21 +79,6 @@ public class ScoreManager : MonoBehaviour
             return;
         currentScore += amount;
 
-        if (floatingTextManager != null && scoreDisplayRectTransform != null)
-        {
-            floatingTextManager.ShowFloatingText(
-                amount,
-                scoreDisplayRectTransform.anchoredPosition,
-                feedbackColor
-            );
-        }
-        else
-        {
-            Debug.LogWarning(
-                "FloatingTextManager or ScoreDisplayRectTransform not set in ScoreManager."
-            );
-        }
-
         OnScoreChanged?.Invoke(currentScore);
     }
 
@@ -144,15 +120,5 @@ public class ScoreManager : MonoBehaviour
         // REMOVED: PlayerPrefs.DeleteKey(ScoreKey);
         OnScoreChanged?.Invoke(currentScore); // Update UI
         Debug.Log("ScoreManager: Runtime score reset to 0.");
-    }
-
-    // --- UI Update ---
-    void UpdateScoreDisplay(decimal newScore)
-    {
-        string formattedScore = NumberFormatter.FormatNumber(newScore);
-        if (balanceText != null)
-        {
-            balanceText.text = $"Balance: {formattedScore}";
-        }
     }
 }
