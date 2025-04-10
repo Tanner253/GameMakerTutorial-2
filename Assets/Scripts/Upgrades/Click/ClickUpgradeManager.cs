@@ -20,18 +20,21 @@ public class ClickUpgradeManager : MonoBehaviour
     // --- Runtime State ---
     private Dictionary<ClickUpgradeData, UpgradeState> playerClickUpgradesState;
     private decimal additiveClickBonus = 0.0M; // Total bonus added from upgrades
+    private decimal permanentClickBonusPercent = 0.0M; // NEW: Bonus from prestige upgrades
     private decimal calculatedClickValue = 1.0M; // Cached final click value
 
     // --- Events ---
     public event Action<decimal> OnClickValueChanged; // Fired when the calculated click value changes
     public event Action<UpgradeState> OnClickUpgradeStateChanged; // Fired when an upgrade level changes
 
+    private PrestigeManager _prestigeManagerInstance; // Cache instance
+
     void Awake()
     {
         if (Instance == null)
         {
             Instance = this;
-            // DontDestroyOnLoad(gameObject); // Optional
+            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -41,6 +44,29 @@ public class ClickUpgradeManager : MonoBehaviour
 
         // Initialize the dictionary immediately, levels will be loaded later
         InitializeClickUpgradeStates();
+    }
+
+    void Start() // Use Start for finding other Singletons safely
+    {
+        _prestigeManagerInstance = PrestigeManager.Instance;
+        if (_prestigeManagerInstance != null)
+        {
+            _prestigeManagerInstance.OnPrestigeCountChanged += HandlePrestigeCountChanged;
+        }
+        else
+        {
+             Debug.LogWarning("ClickUpgradeManager could not find PrestigeManager instance during Start.");
+        }
+        // Ensure initial value calculation includes potential existing prestige bonus
+        CalculateAndCacheClickValue();
+    }
+
+    void OnDestroy() // Unsubscribe
+    {
+         if (_prestigeManagerInstance != null)
+        {
+            _prestigeManagerInstance.OnPrestigeCountChanged -= HandlePrestigeCountChanged;
+        }
     }
 
     /// <summary>
@@ -103,10 +129,24 @@ public class ClickUpgradeManager : MonoBehaviour
     void CalculateAndCacheClickValue()
     {
         // Start with the base value
-        decimal finalValue = baseClickValue + additiveClickBonus;
+        decimal baseValue = baseClickValue;
 
-        // Apply multiplicative bonuses (example)
-        // finalValue = finalValue * multiplicativeClickBonus;
+        // Apply Prestige Level Bonus (Multiplicative on Base)
+        if (_prestigeManagerInstance != null)
+        {
+            int prestigeLevel = _prestigeManagerInstance.GetCurrentPrestigeCount();
+            if (prestigeLevel > 0)
+            {
+                decimal prestigeMultiplier = 1M + ((decimal)prestigeLevel * 0.01M); // +1% per level
+                baseValue *= prestigeMultiplier;
+            }
+        }
+
+        // Apply Prestige Upgrade Bonus (Multiplicative on Base, after Prestige Level bonus)
+        baseValue *= (1M + permanentClickBonusPercent / 100M);
+
+        // Add additive bonus from regular upgrades
+        decimal finalValue = baseValue + additiveClickBonus;
 
         // Ensure click value doesn't go below a minimum (e.g., 0.1 or 1.0 depending on design)
         calculatedClickValue = Math.Max(0.1M, finalValue); // Use M suffix for decimal literal
@@ -185,6 +225,44 @@ public class ClickUpgradeManager : MonoBehaviour
         }
     }
 
+    // NEW: Method called by PrestigeManager to update the permanent bonus
+    public void UpdatePermanentClickBonus(List<UpgradeState> prestigeStates)
+    {
+        Debug.Log($"[ClickUpgradeManager] Attempting UpdatePermanentClickBonus. Received {prestigeStates?.Count ?? -1} states.");
+        if (prestigeStates == null) {
+            Debug.LogError("[ClickUpgradeManager] Received null list for prestigeStates!");
+            permanentClickBonusPercent = 0M;
+            RecalculateTotalClickBonus();
+            return;
+        }
+
+        permanentClickBonusPercent = 0M;
+        foreach(var state in prestigeStates)
+        {
+            if (state == null) {
+                 Debug.LogWarning("[ClickUpgradeManager] Found null state in prestigeStates list.");
+                 continue;
+            }
+             if (state.upgradeDataRef == null) {
+                 Debug.LogWarning("[ClickUpgradeManager] Found state with null upgradeDataRef.");
+                 continue;
+            }
+
+            if(state.upgradeDataRef is PrestigeUpgradeData prestigeData)
+            {
+                if (prestigeData.clickBonusPercentPerLevel > 0)
+                {
+                    permanentClickBonusPercent += (decimal)prestigeData.clickBonusPercentPerLevel * state.level;
+                    // Debug.Log($"[ClickUpgradeManager] Adding { (decimal)prestigeData.clickBonusPercentPerLevel * state.level }% from {prestigeData.name} (Level {state.level})");
+                }
+            }
+            // else { Debug.LogWarning($"[ClickUpgradeManager] State DataRef {state.upgradeDataRef.name} is not PrestigeUpgradeData"); }
+        }
+        Debug.Log($"[ClickUpgradeManager] Permanent Click Bonus updated to: {permanentClickBonusPercent}%");
+        // Recalculate the click value after updating the bonus
+        RecalculateTotalClickBonus(); // This will call CalculateAndCacheClickValue
+    }
+
     // --- Save/Load (Refactored) ---
 
     // NEW: Loads click upgrade levels from the SaveData object.
@@ -234,7 +312,7 @@ public class ClickUpgradeManager : MonoBehaviour
         if (needsRecalculate)
         {
             Debug.Log("ClickUpgradeManager: Levels loaded, recalculating total bonus...");
-            RecalculateTotalClickBonus();
+            RecalculateTotalClickBonus(); // This now correctly factors in permanent bonus via CalculateAndCacheClickValue
         }
         else
         {
@@ -242,22 +320,23 @@ public class ClickUpgradeManager : MonoBehaviour
         }
     }
 
-    // NEW: Provides click upgrade data for saving.
-    public List<UpgradeSaveData> GetData()
+    // NEW: Updates the SaveData object with click upgrade data.
+    public void UpdateSaveData(SaveData saveData)
     {
-        List<UpgradeSaveData> dataToSave = new List<UpgradeSaveData>();
+        if (saveData == null) return;
+
+        saveData.clickUpgradeLevels = new List<UpgradeSaveData>();
         foreach (var kvp in playerClickUpgradesState)
         {
-            if (kvp.Key != null && kvp.Value.level > 0) // Only save upgrades with level > 0
+            if (kvp.Key != null && kvp.Value.level > 0)
             {
-                dataToSave.Add(new UpgradeSaveData
+                saveData.clickUpgradeLevels.Add(new UpgradeSaveData
                 {
-                    upgradeName = kvp.Key.name, // Use ScriptableObject name as ID
+                    upgradeName = kvp.Key.name,
                     level = kvp.Value.level
                 });
             }
         }
-        return dataToSave;
     }
 
     // CHANGED: Renamed from ResetClickUpgrades, now only resets runtime state.
@@ -285,5 +364,11 @@ public class ClickUpgradeManager : MonoBehaviour
             RecalculateTotalClickBonus(); // Recalculate bonus (will go back to base)
              Debug.Log("ClickUpgradeManager: Runtime levels reset.");
         }
+    }
+
+    private void HandlePrestigeCountChanged(int newPrestigeCount) // Method to handle event
+    {
+        // Recalculate click value when prestige level changes
+        CalculateAndCacheClickValue();
     }
 } 

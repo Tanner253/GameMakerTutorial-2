@@ -21,7 +21,7 @@ public class ScoreManager : MonoBehaviour
         if (Instance == null)
         {
             Instance = this;
-            // DontDestroyOnLoad(gameObject); // Optional: If needs to persist across scenes independently
+            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -120,10 +120,18 @@ public class ScoreManager : MonoBehaviour
 
     // --- Save/Load (Refactored) ---
 
-    // NEW: Returns the current score as a string for serialization.
-    public string GetData()
+    // OLD: Returns the current score as a string for serialization.
+    // public string GetData()
+    // {
+    //     return currentScore.ToString(CultureInfo.InvariantCulture);
+    // }
+
+    // NEW: Updates the SaveData object with score data.
+    public void UpdateSaveData(SaveData saveData)
     {
-        return currentScore.ToString(CultureInfo.InvariantCulture);
+        if (saveData == null) return;
+        saveData.currentScore = currentScore.ToString(CultureInfo.InvariantCulture);
+        // Note: totalLifetimeScoreEarned is handled by PrestigeManager
     }
 
     /// <summary>

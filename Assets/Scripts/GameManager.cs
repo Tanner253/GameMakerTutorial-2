@@ -24,6 +24,7 @@ public class GameManager : MonoBehaviour
     public ClickUpgradeManager clickUpgradeManager; // ADDED
     public ProductionManager productionManager; // Keep reference
     public SaveLoadManager saveLoadManager; // ADDED
+    public PrestigeManager prestigeManager; // NEW
 
     // --- UI References (Only those not specific to other managers) ---
     [Header("UI References")]
@@ -55,6 +56,7 @@ public class GameManager : MonoBehaviour
         if (productionManager == null) productionManager = FindFirstObjectByType<ProductionManager>(); // May still be null if not in scene
         if (saveLoadManager == null) saveLoadManager = FindFirstObjectByType<SaveLoadManager>();
         if (floatingTextManager == null) floatingTextManager = FindFirstObjectByType<FloatingTextManager>();
+        if (prestigeManager == null) prestigeManager = FindFirstObjectByType<PrestigeManager>(); // NEW
 
         // Null check managers after attempting to find them
         if (scoreManager == null) Debug.LogError("GameManager could not find ScoreManager!");
@@ -63,12 +65,14 @@ public class GameManager : MonoBehaviour
         if (productionManager == null) Debug.LogWarning("GameManager could not find ProductionManager (This is expected if the scene doesn't use passive production).");
         if (saveLoadManager == null) Debug.LogError("GameManager could not find SaveLoadManager!");
         if (floatingTextManager == null) Debug.LogError("GameManager could not find FloatingTextManager!");
+        if (prestigeManager == null) Debug.LogError("GameManager could not find PrestigeManager!"); // NEW
 
         // --- Initialization and Loading ---
         // Ensure SaveLoadManager exists before trying to initialize
         if (saveLoadManager != null)
         {
-             saveLoadManager.InitializeManagers(); // SaveLoadManager now coordinates loading/initialization
+            // Let SaveLoadManager initialize all managers it needs access to
+            saveLoadManager.InitializeManagers(scoreManager, clickUpgradeManager, productionManager, prestigeManager); 
         }
         else
         {
@@ -101,6 +105,9 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
+        // Apply offline progress calculation *after* all managers are loaded and initialized
+        ApplyOfflineProduction();
+
         // Get initial production rate and update display (if ProductionManager exists)
         if (productionManager != null)
         {
@@ -148,20 +155,43 @@ public class GameManager : MonoBehaviour
     }
 
     // --- Game Reset --- 
-    // Delegate reset to SaveLoadManager
-    public void ResetGameData()
+    // This might need adjustment - Does Reset Game Data mean prestige or a full wipe?
+    // Assuming ResetGameData performs a PRESTIGE action for now.
+    public void RequestPrestige()
     {
-        saveLoadManager?.ResetAllGameData();
+        // Delegate the actual prestige logic to PrestigeManager
+        prestigeManager?.PerformPrestige();
+    }
 
-        // Potentially re-fetch initial state displays after reset if needed
+    // If a full hard reset is needed separate from prestige:
+    public void HardResetGameData()
+    {
+        Debug.LogWarning("Performing HARD RESET - Deleting save file and resetting runtime data.");
+        saveLoadManager?.DeleteSaveFile(); // Delete the save file
+
+        // Reset runtime data in all managers
+        scoreManager?.ResetData();
+        clickUpgradeManager?.ResetData();
+        productionManager?.ResetData();
+        prestigeManager?.ResetData(); // NEW call
+
+        // Update UI explicitly if needed, as events should handle most of it
+        // Example: Ensure production rate display is updated
         if (productionManager != null)
         {
-            UpdateProductionRateDisplay(productionManager.GetTotalProductionRatePerSecond());
+             UpdateProductionRateDisplay(productionManager.GetTotalProductionRatePerSecond());
         }
         else
         {
-            UpdateProductionRateDisplay(0);
+             UpdateProductionRateDisplay(0);
         }
+
+        // *** NEW STEP: Immediately save the reset state ***
+        saveLoadManager?.SaveGameData();
+
+        Debug.LogWarning("Hard Reset Complete. Save file deleted, runtime data reset, and reset state saved.");
+
+        // REMOVED: SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
     // --- Production Rate Display --- 
@@ -174,6 +204,21 @@ public class GameManager : MonoBehaviour
             string formattedRate = NumberFormatter.FormatNumber(newTotalRate);
 
             totalProductionRateText.text = $"Generating: {formattedRate}/s";
+        }
+    }
+
+    // NEW: Method to handle offline calculation call
+    void ApplyOfflineProduction()
+    {
+        if (productionManager != null && saveLoadManager != null)
+        {
+            long lastTimestamp = saveLoadManager.GetLastLoadedTimestampTicks();
+            Debug.Log($"[GameManager.Start] Retrieved lastSaveTimestampTicks: {lastTimestamp}");
+            productionManager.ApplyOfflineProgress(lastTimestamp);
+        }
+        else
+        {
+            Debug.LogWarning("Cannot apply offline progress: ProductionManager or SaveLoadManager not found.");
         }
     }
 }

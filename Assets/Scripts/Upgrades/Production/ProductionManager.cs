@@ -29,12 +29,14 @@ public class ProductionManager : MonoBehaviour
     /// </summary>
     public event Action<decimal> OnTotalProductionRateChanged;
 
+    private PrestigeManager _prestigeManagerInstance; // Cache instance
+
     void Awake()
     {
         if (Instance == null)
         {
             Instance = this;
-            // Optional: DontDestroyOnLoad(gameObject);
+            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -43,6 +45,29 @@ public class ProductionManager : MonoBehaviour
         }
 
         InitializePlayerUpgradesList();
+    }
+
+    void Start() // Use Start for finding other Singletons safely
+    {
+        _prestigeManagerInstance = PrestigeManager.Instance;
+        if (_prestigeManagerInstance != null)
+        {
+            _prestigeManagerInstance.OnPrestigeCountChanged += HandlePrestigeCountChanged;
+        }
+        else
+        {
+            Debug.LogWarning("ProductionManager could not find PrestigeManager instance during Start.");
+        }
+        // Ensure initial rate calculation includes potential existing prestige bonus
+        UpdateTotalRateAndNotify();
+    }
+
+    void OnDestroy() // Unsubscribe
+    {
+         if (_prestigeManagerInstance != null)
+        {
+            _prestigeManagerInstance.OnPrestigeCountChanged -= HandlePrestigeCountChanged;
+        }
     }
 
     void Update()
@@ -148,6 +173,18 @@ public class ProductionManager : MonoBehaviour
                 }
             }
         }
+
+        // Apply Prestige Bonus
+        if (_prestigeManagerInstance != null)
+        {
+            int prestigeLevel = _prestigeManagerInstance.GetCurrentPrestigeCount();
+            if (prestigeLevel > 0)
+            {
+                decimal prestigeMultiplier = 1M + ((decimal)prestigeLevel * 0.01M); // +1% per level
+                totalRate *= prestigeMultiplier;
+            }
+        }
+
         return totalRate;
     }
 
@@ -216,24 +253,24 @@ public class ProductionManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Provides production upgrade data for saving.
+    /// Updates the SaveData object with production upgrade data.
     /// </summary>
-    public List<UpgradeSaveData> GetData()
+    public void UpdateSaveData(SaveData saveData)
     {
-        List<UpgradeSaveData> dataToSave = new List<UpgradeSaveData>();
+        if (saveData == null) return;
+
+        saveData.productionUpgradeLevels = new List<UpgradeSaveData>();
         foreach (var upgradeState in playerProductionUpgrades)
         {
-            // Check if the reference is valid and level is > 0
             if (upgradeState.upgradeDataRef != null && upgradeState.level > 0)
             {
-                dataToSave.Add(new UpgradeSaveData
+                saveData.productionUpgradeLevels.Add(new UpgradeSaveData
                 {
-                    upgradeName = upgradeState.upgradeDataRef.name, // Use SO name as ID
+                    upgradeName = upgradeState.upgradeDataRef.name,
                     level = upgradeState.level
                 });
             }
         }
-        return dataToSave;
     }
 
     /// <summary>
@@ -317,5 +354,66 @@ public class ProductionManager : MonoBehaviour
         {
             Debug.LogError($"Could not find state for ProductionUpgradeData: {data.name} during ApplyUpgrade.");
         }
+    }
+
+    // NEW: Method to calculate and apply offline progress
+    public void ApplyOfflineProgress(long lastSaveTimestampTicks)
+    {
+        Debug.Log($"[OfflineProgress] Attempting calculation. LastSaveTicks: {lastSaveTimestampTicks}");
+        if (lastSaveTimestampTicks == 0) {
+            Debug.Log("[OfflineProgress] First load or no valid timestamp. Skipping calculation.");
+            return; // Don't calculate if it's the first ever load
+        }
+
+        DateTime lastSaveTime = new DateTime(lastSaveTimestampTicks, DateTimeKind.Utc);
+        DateTime currentTime = DateTime.UtcNow;
+        TimeSpan timeElapsed = currentTime - lastSaveTime;
+        Debug.Log($"[OfflineProgress] Last Save Time: {lastSaveTime:O}, Current Time: {currentTime:O}");
+
+        // --- Sanity Check / Cap --- 
+        double maxOfflineHours = 12.0; // Set your desired cap here (e.g., 12 hours)
+        double elapsedHours = timeElapsed.TotalHours;
+        Debug.Log($"[OfflineProgress] Elapsed Hours Raw: {elapsedHours:F4}");
+
+        if (elapsedHours <= 0) {
+             Debug.Log("[OfflineProgress] Elapsed time is zero or negative. Skipping calculation.");
+             return; // Time went backwards or no time passed
+        }
+
+        double hoursToCredit = Math.Min(elapsedHours, maxOfflineHours);
+        // Optional: Log if capping occurred
+        if (elapsedHours > maxOfflineHours)
+        {
+            Debug.Log($"[OfflineProgress] Offline time ({elapsedHours:F1} hrs) exceeded cap ({maxOfflineHours} hrs). Crediting capped amount.");
+        }
+        Debug.Log($"[OfflineProgress] Hours to Credit (Capped): {hoursToCredit:F4}");
+        // --------------------------
+
+        decimal currentRatePerSecond = GetTotalProductionRatePerSecond();
+        Debug.Log($"[OfflineProgress] Current Prod Rate Per Second: {currentRatePerSecond:F4}");
+
+        if (currentRatePerSecond <= 0) {
+             Debug.Log("[OfflineProgress] Production rate is zero. No progress to apply.");
+             return; // No production rate, nothing to add
+        }
+
+        decimal scoreGenerated = currentRatePerSecond * (decimal)(hoursToCredit * 3600.0);
+        Debug.Log($"[OfflineProgress] Calculated Score Generated: {NumberFormatter.FormatNumber(scoreGenerated)} ({scoreGenerated})");
+
+        if (scoreGenerated > 0 && ScoreManager.Instance != null)
+        {
+            Debug.Log($"[OfflineProgress] Applying offline progress: Crediting {NumberFormatter.FormatNumber(scoreGenerated)} score for {hoursToCredit:F1} hours offline.");
+            ScoreManager.Instance.AddScore(scoreGenerated); // Add score without feedback noise
+        }
+        else if (ScoreManager.Instance == null)
+        {
+             Debug.LogError("[OfflineProgress] ScoreManager.Instance is null! Cannot add score.");
+        }
+    }
+
+    private void HandlePrestigeCountChanged(int newPrestigeCount) // Method to handle event
+    {
+        // Recalculate total rate when prestige level changes
+        UpdateTotalRateAndNotify();
     }
 } 

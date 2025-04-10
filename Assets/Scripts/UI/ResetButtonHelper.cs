@@ -20,9 +20,9 @@ public class ResetButtonHelper : MonoBehaviour
             resetButton.onClick.RemoveAllListeners();
 
             // Add the listener purely through code, targeting the current instance
-            resetButton.onClick.AddListener(gameManager.ResetGameData);
+            resetButton.onClick.AddListener(gameManager.HardResetGameData);
             Debug.Log(
-                $"ResetButtonHelper: Added listener for GameManager.ResetGameData on {gameObject.name}"
+                $"ResetButtonHelper: Added listener for GameManager.HardResetGameData on {gameObject.name}"
             );
         }
         else
@@ -50,7 +50,7 @@ public class ResetButtonHelper : MonoBehaviour
         // Check if Instance is still valid before trying to access it
         if (GameManager.Instance != null && resetButton != null)
         {
-            resetButton.onClick.RemoveListener(GameManager.Instance.ResetGameData); // Attempt removal
+            resetButton.onClick.RemoveListener(GameManager.Instance.HardResetGameData); // Attempt removal
         }
     }
 }

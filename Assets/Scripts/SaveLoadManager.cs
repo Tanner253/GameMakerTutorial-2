@@ -13,17 +13,19 @@ public class SaveLoadManager : MonoBehaviour
     private ScoreManager _scoreManager;
     private ClickUpgradeManager _clickUpgradeManager;
     private ProductionManager _productionManager; // Optional
+    private PrestigeManager _prestigeManager; // NEW
 
     // --- Configuration ---
     private string saveFileName = "gameSave.dat"; // Name of the encrypted save file
     private string saveFilePath;
+    private long _loadedTimestampTicks = 0; // NEW: Store timestamp after load
 
     void Awake()
     {
         if (Instance == null)
         {
             Instance = this;
-            // DontDestroyOnLoad(gameObject); // Optional
+            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -40,11 +42,15 @@ public class SaveLoadManager : MonoBehaviour
     /// Called by GameManager during Awake to find manager references
     /// and then coordinate the initial loading sequence.
     /// </summary>
-    public void InitializeManagers()
+    public void InitializeManagers(ScoreManager sm, ClickUpgradeManager cum, ProductionManager pm, PrestigeManager prs)
     {
-        _scoreManager = ScoreManager.Instance;
-        _clickUpgradeManager = ClickUpgradeManager.Instance;
-        _productionManager = ProductionManager.Instance; // Might be null
+        _scoreManager = sm;
+        _clickUpgradeManager = cum;
+        _productionManager = pm;
+        _prestigeManager = prs; // NEW
+
+        // Pass manager references needed by PrestigeManager
+        _prestigeManager?.InitializeManagers(_scoreManager, _clickUpgradeManager, _productionManager, this);
 
         // Load sequence
         LoadGameData();
@@ -115,8 +121,19 @@ public class SaveLoadManager : MonoBehaviour
         _clickUpgradeManager?.LoadData(loadedData);
         Debug.Log("[Load] Initializing ProductionManager...");
         _productionManager?.LoadData(loadedData);
+        Debug.Log("[Load] Initializing PrestigeManager..."); // NEW
+        _prestigeManager?.LoadData(loadedData); // NEW
+
+        // NEW: Store the loaded timestamp
+        _loadedTimestampTicks = loadedData?.lastSaveTimestampTicks ?? 0;
 
         Debug.Log("[Load] SaveLoadManager: LoadGameData finished. Managers initialized with loaded/default data.");
+    }
+
+    // NEW: Getter for the loaded timestamp
+    public long GetLastLoadedTimestampTicks()
+    {
+        return _loadedTimestampTicks;
     }
 
     /// <summary>
@@ -129,12 +146,14 @@ public class SaveLoadManager : MonoBehaviour
         // 1. Gather data from managers
         SaveData dataToSave = new SaveData();
 
-        if (_scoreManager != null)
-            dataToSave.currentScore = _scoreManager.GetData();
-        if (_clickUpgradeManager != null)
-            dataToSave.clickUpgradeLevels = _clickUpgradeManager.GetData();
-        if (_productionManager != null)
-            dataToSave.productionUpgradeLevels = _productionManager.GetData();
+        // Call UpdateSaveData on managers that need to populate the SaveData object
+        _scoreManager?.UpdateSaveData(dataToSave);             // Needs UpdateSaveData method
+        _clickUpgradeManager?.UpdateSaveData(dataToSave);      // Needs UpdateSaveData method
+        _productionManager?.UpdateSaveData(dataToSave);        // Needs UpdateSaveData method
+        _prestigeManager?.UpdateSaveData(dataToSave); // Call new method
+
+        // NEW: Record the current time before saving
+        dataToSave.lastSaveTimestampTicks = DateTime.UtcNow.Ticks;
 
         // 2. Serialize to JSON
         string json = JsonUtility.ToJson(dataToSave, true); // Use pretty print for debug, false for release
@@ -164,38 +183,25 @@ public class SaveLoadManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Resets runtime data in managers and deletes the encrypted save file.
+    /// Deletes the save file. Called by GameManager during Hard Reset.
     /// </summary>
-    public void ResetAllGameData()
+    public void DeleteSaveFile()
     {
-        Debug.Log("SaveLoadManager: --- Resetting All Game Data --- ");
-
-        // Reset runtime state in managers first
-        _scoreManager?.ResetData();
-        _clickUpgradeManager?.ResetData();
-        _productionManager?.ResetData();
-
-        // Delete the save file
         if (File.Exists(saveFilePath))
         {
             try
             {
                 File.Delete(saveFilePath);
-                 Debug.Log($"SaveLoadManager: Encrypted save file deleted: {saveFilePath}");
+                Debug.Log($"SaveLoadManager: Encrypted save file deleted: {saveFilePath}");
             }
             catch (Exception ex)
             {
-                 Debug.LogError($"SaveLoadManager: Failed to delete save file: {ex.Message}");
+                Debug.LogError($"SaveLoadManager: Failed to delete save file: {ex.Message}");
             }
         }
         else
         {
-             Debug.Log("SaveLoadManager: No save file found to delete.");
+            Debug.Log("SaveLoadManager: No save file found to delete.");
         }
-
-         // REMOVED: PlayerPrefs.DeleteAll();
-         // REMOVED: PlayerPrefs.Save();
-
-        Debug.Log("SaveLoadManager: Reset complete. Runtime data reset and save file deleted (if existed).");
     }
 } 

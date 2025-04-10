@@ -115,6 +115,7 @@ public class FloatingTextManager : MonoBehaviour
             return;
         }
 
+        // --- Calculate Initial Position (Simplified back to original) ---
         // Calculate random offset
         float randomX = Random.Range(-randomXRange / 2f, randomXRange / 2f);
         float randomY = Random.Range(-randomYRange / 2f, randomYRange / 2f);
@@ -122,6 +123,7 @@ public class FloatingTextManager : MonoBehaviour
 
         // Set initial position
         textRectTransform.anchoredPosition = sourceAnchoredPosition + new Vector2(baseSpawnOffset.x, baseSpawnOffset.y) + randomOffset;
+        // --- End Position Calculation ---
 
         // Set text content and appearance
         textMesh.text = NumberFormatter.FormatNumber(value, true);
@@ -185,7 +187,7 @@ public class FloatingTextManager : MonoBehaviour
 
     }
 
-    // --- Cleanup --- 
+    // --- Cleanup ---
     void OnDestroy()
     {
         // Dispose of the pool and destroy any remaining active instances
