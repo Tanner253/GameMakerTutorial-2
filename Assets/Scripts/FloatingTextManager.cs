@@ -17,6 +17,19 @@ public class FloatingTextManager : MonoBehaviour
     [Tooltip("Set the font size for the feedback text.")]
     public float feedbackFontSize = 36f; // Added font size control
 
+    [Header("Manual Click Floating Text Settings")] // NEW HEADER
+    [Tooltip("Base offset from the click position for manual click text.")]
+    public Vector3 manualClickBaseSpawnOffset = new Vector3(0, 50, 0); // Different default
+    [Tooltip("How long the manual click text floats (seconds).")]
+    public float manualClickFloatDuration = 0.6f; // Different default
+    [Tooltip("How fast the manual click text floats up.")]
+    public float manualClickFloatSpeed = 120f; // Different default
+    [Tooltip("Max random horizontal offset (+/-) for manual click text.")]
+    public float manualClickRandomXRange = 80f; // Different default
+    [Tooltip("Max random vertical offset (+/-) for manual click text.")]
+    public float manualClickRandomYRange = 40f; // Different default
+    // Note: Font size is kept global for now unless explicitly requested otherwise.
+
     [Header("Pooling Settings")]
     public int defaultCapacity = 10;
     public int maxPoolSize = 50;
@@ -29,16 +42,72 @@ public class FloatingTextManager : MonoBehaviour
 
     void Awake()
     {
-        // Initialize the pool
+        InitializePool();
+    }
+
+    // NEW: Method to find scene-specific references after scene load
+    public void FindSceneReferences()
+    {
+        // Clear the pool first - objects belong to the previous scene instance
+        if (_floatingTextPool != null)
+        {
+            Debug.Log("[FloatingTextManager] Clearing object pool due to scene change.");
+            _floatingTextPool.Clear(); // This should call OnDestroyPoolObject for active/pooled items
+            // We might need to re-initialize the pool instance itself if Clear disposes it, 
+            // but ObjectPool<T> typically just clears internal collections.
+            // Re-initializing just in case:
+            InitializePool();
+        }
+        else
+        {
+             // Pool didn't exist, initialize it
+             InitializePool();
+        }
+        
+        // Find the parent for text spawning - assuming it's under a Canvas named "Canvas"
+        // Adjust "Canvas/FloatingText" if your hierarchy is different
+        GameObject canvasGO = GameObject.Find("Canvas");
+        if (canvasGO != null)
+        {
+            Transform foundParent = canvasGO.transform.Find("FloatingText"); 
+            if (foundParent != null)
+            {
+                textSpawnParent = foundParent;
+                Debug.Log("[FloatingTextManager] Found scene reference for textSpawnParent.", textSpawnParent);
+            }
+            else
+            {
+                 Debug.LogError("[FloatingTextManager] Could not find child 'FloatingText' under 'Canvas' for textSpawnParent!");
+                 textSpawnParent = null; // Ensure it's null if not found
+            }
+        }
+        else
+        {
+             Debug.LogError("[FloatingTextManager] Could not find GameObject named 'Canvas' to search for textSpawnParent!");
+             textSpawnParent = null; // Ensure it's null if not found
+        }
+
+        // Re-initialize pool if it was somehow lost (less likely, but for safety)
+        // REMOVED - Now handled at the start of the method
+        // if (_floatingTextPool == null)
+        // {
+        //     Debug.LogWarning("[FloatingTextManager] Pool was null in FindSceneReferences. Re-initializing.");
+        //     InitializePool(); // Ensure pool exists
+        // }
+    }
+
+    // Extracted pool initialization to its own method
+    private void InitializePool()
+    {
         _floatingTextPool = new ObjectPool<GameObject>(
-            CreatePooledItem,
-            OnTakeFromPool,
-            OnReturnedToPool,
-            OnDestroyPoolObject,
-            true, // Collection check (optional, for safety)
-            defaultCapacity,
-            maxPoolSize
-        );
+           CreatePooledItem,
+           OnTakeFromPool,
+           OnReturnedToPool,
+           OnDestroyPoolObject,
+           true, // Collection check (optional, for safety)
+           defaultCapacity,
+           maxPoolSize
+       );
     }
 
     // --- Object Pool Methods ---
@@ -86,14 +155,23 @@ public class FloatingTextManager : MonoBehaviour
 
     // --- Show Floating Text Logic (Modified for Pooling) ---
 
-    // Overload 1: Default color
+    // Overload 1: Default color (NOW USES MANUAL CLICK SETTINGS)
     public void ShowFloatingText(decimal value, Vector2 sourceAnchoredPosition)
     {
-        ShowFloatingText(value, sourceAnchoredPosition, null);
+        // Explicitly call the other overload, passing the manual click color and null for other settings
+        // This ensures we use the manual click parameters within that overload's logic.
+        ShowFloatingTextInternal(value, sourceAnchoredPosition, null, true); // Pass null for color, internal method generates random
     }
 
-    // Overload 2: Specific color
+    // Overload 2: Specific color (USED BY PRODUCTION/OTHER SYSTEMS)
     public void ShowFloatingText(decimal value, Vector2 sourceAnchoredPosition, Color? textColor)
+    {
+        // Pass false to indicate non-manual click
+        ShowFloatingTextInternal(value, sourceAnchoredPosition, textColor, false);
+    }
+
+    // Internal method to handle common logic and parameter differences
+    private void ShowFloatingTextInternal(decimal value, Vector2 sourceAnchoredPosition, Color? textColor, bool isManualClick)
     {
         if (floatingTextPrefab == null || textSpawnParent == null)
         {
@@ -101,12 +179,12 @@ public class FloatingTextManager : MonoBehaviour
             return;
         }
 
-        // Get an instance from the pool instead of instantiating
+        // Get an instance from the pool
         GameObject textInstance = _floatingTextPool.Get();
-        if (textInstance == null) return; // Pool failed to provide an instance
+        if (textInstance == null) return;
 
         RectTransform textRectTransform = textInstance.GetComponent<RectTransform>();
-        TextMeshProUGUI textMesh = textInstance.GetComponentInChildren<TextMeshProUGUI>(); // Assume prefab structure is correct
+        TextMeshProUGUI textMesh = textInstance.GetComponentInChildren<TextMeshProUGUI>();
 
         if (textRectTransform == null || textMesh == null)
         {
@@ -115,50 +193,78 @@ public class FloatingTextManager : MonoBehaviour
             return;
         }
 
-        // --- Calculate Initial Position (Simplified back to original) ---
-        // Calculate random offset
-        float randomX = Random.Range(-randomXRange / 2f, randomXRange / 2f);
-        float randomY = Random.Range(-randomYRange / 2f, randomYRange / 2f);
-        Vector2 randomOffset = new Vector2(randomX, randomY);
+        // --- Determine Settings Based on Source ---
+        Vector3 actualBaseOffset = isManualClick ? manualClickBaseSpawnOffset : baseSpawnOffset;
+        float actualRandomX = isManualClick ? manualClickRandomXRange : randomXRange;
+        float actualRandomY = isManualClick ? manualClickRandomYRange : randomYRange;
+        float actualDuration = isManualClick ? manualClickFloatDuration : floatDuration;
+        float actualSpeed = isManualClick ? manualClickFloatSpeed : floatSpeed;
+        Color actualColor;
+        // float outlineThickness = 0f; // REMOVED - Using Underlay now
+        // Color outlineColor = Color.black; // REMOVED
 
-        // Set initial position
-        textRectTransform.anchoredPosition = sourceAnchoredPosition + new Vector2(baseSpawnOffset.x, baseSpawnOffset.y) + randomOffset;
+        // Get the material instance. Accessing .fontMaterial creates an instance if needed.
+        Material materialInstance = textMesh.fontMaterial;
+
+        if (isManualClick)
+        {
+            // Generate a random bright color for manual clicks
+            actualColor = Random.ColorHSV(0f, 1f, 0.8f, 1f, 0.8f, 1f); // Hue, Saturation Min/Max, Value Min/Max
+            // outlineThickness = 0.15f; // REMOVED
+
+            // Enable and configure Underlay for manual clicks
+            materialInstance.EnableKeyword("UNDERLAY_ON");
+            materialInstance.SetColor("_UnderlayColor", new Color(0.1f, 0.1f, 0.1f, 0.85f)); // Dark grey glow, good opacity
+            materialInstance.SetFloat("_UnderlayOffsetX", 0.5f); // Keep offset minimal for centered glow
+            materialInstance.SetFloat("_UnderlayOffsetY", -0.5f); // Keep offset minimal for centered glow
+            materialInstance.SetFloat("_UnderlayDilate", 0.5f); // Significantly Increased Spread/thickness
+            materialInstance.SetFloat("_UnderlaySoftness", 0.6f); // Significantly Increased Blurring/glow
+        }
+        else
+        {
+            // Use provided color or default white for production/other text
+            actualColor = textColor ?? Color.white;
+            // outlineThickness = 0f; // REMOVED
+
+            // Ensure Underlay is disabled for production text
+            materialInstance.DisableKeyword("UNDERLAY_ON");
+        }
+
+        // Ensure outline is explicitly off for both cases
+        textMesh.outlineWidth = 0f;
+
+        // --- Calculate Initial Position ---
+        float randomX = Random.Range(-actualRandomX / 2f, actualRandomX / 2f);
+        float randomY = Random.Range(-actualRandomY / 2f, actualRandomY / 2f);
+        Vector2 randomOffset = new Vector2(randomX, randomY);
+        textRectTransform.anchoredPosition = sourceAnchoredPosition + new Vector2(actualBaseOffset.x, actualBaseOffset.y) + randomOffset;
         // --- End Position Calculation ---
 
         // Set text content and appearance
         textMesh.text = NumberFormatter.FormatNumber(value, true);
-        textMesh.fontSize = feedbackFontSize;
+        textMesh.fontSize = feedbackFontSize; // Font size remains global for now
+        textMesh.color = actualColor; // Apply vertex color (main text color)
 
-        // Determine initial color
-        Color startColor;
-        if (textColor.HasValue)
-        {
-            // Use the provided color
-            startColor = textColor.Value;
-        }
-        else
-        {
-            // No color provided (e.g., manual click), explicitly use white
-            startColor = Color.white;
-        }
-        // Apply the determined color immediately (alpha will be set in coroutine)
-        textMesh.color = startColor;
+        // Apply outline settings (REMOVED as we apply via material now)
+        // textMesh.outlineWidth = outlineThickness;
+        // textMesh.outlineColor = outlineColor;
 
-        // Start the animation coroutine
-        Coroutine animationCoroutine = StartCoroutine(FloatAndFadeText(textInstance, textRectTransform, textMesh, startColor));
+        // Start the animation coroutine with appropriate duration and speed
+        // Pass the main text color (startColor) to the coroutine
+        Coroutine animationCoroutine = StartCoroutine(FloatAndFadeText(textInstance, textRectTransform, textMesh, actualColor, actualDuration, actualSpeed));
         _activeCoroutines[textInstance] = animationCoroutine; // Track the coroutine
-
     }
 
-    // --- Coroutine (Modified for Pooling) ---
+    // --- Coroutine (Modified for Pooling & Parameters) ---
 
-    IEnumerator FloatAndFadeText(GameObject instance, RectTransform rectTransform, TextMeshProUGUI textMesh, Color startColor)
+    IEnumerator FloatAndFadeText(GameObject instance, RectTransform rectTransform, TextMeshProUGUI textMesh, Color startColor, float duration, float speed) // Added duration and speed parameters
     {
         float timer = 0f;
-        // Ensure starting alpha is correct (might have been faded out when returned to pool)
+        // Ensure starting vertex color alpha is correct
         textMesh.color = new Color(startColor.r, startColor.g, startColor.b, 1f);
+        // We will fade the vertex color alpha. The underlay color alpha is fixed.
 
-        while (timer < floatDuration)
+        while (timer < duration)
         {
             // Check instance validity (might be released prematurely)
             if (instance == null || !instance.activeInHierarchy)
@@ -167,12 +273,13 @@ public class FloatingTextManager : MonoBehaviour
                  yield break; // Stop if object was returned to pool early
             }
 
-            // Move up using anchoredPosition
-            rectTransform.anchoredPosition += Vector2.up * floatSpeed * Time.deltaTime;
+            // Move up using anchoredPosition with parameterized speed
+            rectTransform.anchoredPosition += Vector2.up * speed * Time.deltaTime;
 
-            // Fade out
-            float alpha = Mathf.Lerp(1f, 0f, timer / floatDuration);
+            // Fade out vertex color alpha
+            float alpha = Mathf.Lerp(1f, 0f, timer / duration);
             textMesh.color = new Color(startColor.r, startColor.g, startColor.b, alpha);
+            // Note: The underlay color alpha remains constant from what we set in ShowFloatingTextInternal
 
             timer += Time.deltaTime;
             yield return null; // Wait for the next frame
@@ -184,7 +291,6 @@ public class FloatingTextManager : MonoBehaviour
         {
              _floatingTextPool.Release(instance);
         }
-
     }
 
     // --- Cleanup ---

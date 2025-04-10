@@ -29,8 +29,13 @@ public class GameManager : MonoBehaviour
     // --- UI References (Only those not specific to other managers) ---
     [Header("UI References")]
     public FloatingTextManager floatingTextManager;
+    [Tooltip("ASSIGN IN INSPECTOR! This will be re-found on scene load if needed.")]
     public RectTransform scoreDisplayRectTransform; // Still needed for floating text position
+    [Tooltip("ASSIGN IN INSPECTOR! This will be re-found on scene load if needed.")]
     public TextMeshProUGUI totalProductionRateText;
+
+    [Header("Scene Config")]
+    [SerializeField] private string mainGameSceneName = "Main"; // Adjust if your main scene name is different
 
     void Awake()
     {
@@ -50,77 +55,139 @@ public class GameManager : MonoBehaviour
         globalProgressionScale = Mathf.Max(0.1f, globalProgressionScale);
 
         // --- Find Manager References if not assigned ---
-        // It's generally better to assign these in the Inspector, but this provides fallback.
+        // Managers are DontDestroyOnLoad, so finding them once in Awake is fine
         if (scoreManager == null) scoreManager = FindFirstObjectByType<ScoreManager>();
         if (clickUpgradeManager == null) clickUpgradeManager = FindFirstObjectByType<ClickUpgradeManager>();
-        if (productionManager == null) productionManager = FindFirstObjectByType<ProductionManager>(); // May still be null if not in scene
+        if (productionManager == null) productionManager = FindFirstObjectByType<ProductionManager>(); 
         if (saveLoadManager == null) saveLoadManager = FindFirstObjectByType<SaveLoadManager>();
         if (floatingTextManager == null) floatingTextManager = FindFirstObjectByType<FloatingTextManager>();
-        if (prestigeManager == null) prestigeManager = FindFirstObjectByType<PrestigeManager>(); // NEW
+        if (prestigeManager == null) prestigeManager = FindFirstObjectByType<PrestigeManager>(); 
 
         // Null check managers after attempting to find them
         if (scoreManager == null) Debug.LogError("GameManager could not find ScoreManager!");
         if (clickUpgradeManager == null) Debug.LogError("GameManager could not find ClickUpgradeManager!");
-        // ProductionManager can be optional
         if (productionManager == null) Debug.LogWarning("GameManager could not find ProductionManager (This is expected if the scene doesn't use passive production).");
         if (saveLoadManager == null) Debug.LogError("GameManager could not find SaveLoadManager!");
         if (floatingTextManager == null) Debug.LogError("GameManager could not find FloatingTextManager!");
-        if (prestigeManager == null) Debug.LogError("GameManager could not find PrestigeManager!"); // NEW
+        if (prestigeManager == null) Debug.LogError("GameManager could not find PrestigeManager!"); 
 
         // --- Initialization and Loading ---
-        // Ensure SaveLoadManager exists before trying to initialize
         if (saveLoadManager != null)
         {
-            // Let SaveLoadManager initialize all managers it needs access to
             saveLoadManager.InitializeManagers(scoreManager, clickUpgradeManager, productionManager, prestigeManager); 
         }
         else
         {
              Debug.LogError("CRITICAL: SaveLoadManager not found! Game cannot be loaded or saved.");
-             // Handle this critical error appropriately - maybe load defaults manually or stop execution?
         }
        
         // Subscribe to ProductionManager's event (if it exists)
+        // Note: If ProductionManager is also DontDestroyOnLoad, this subscription is fine here.
+        // If ProductionManager is scene-specific, subscription needs to happen after scene load.
         if (productionManager != null)
         {
             productionManager.OnTotalProductionRateChanged += UpdateProductionRateDisplay;
-            // Also update display with initial rate from ProductionManager if it exists
-            UpdateProductionRateDisplay(productionManager.GetTotalProductionRatePerSecond());
-        }
-        else
-        {
-            // Set display to 0 if no production manager
-            UpdateProductionRateDisplay(0);
         }
     }
 
-    void OnDestroy()
+    // --- Scene Load Handling ---
+    void OnEnable()
     {
-        // Unsubscribe from ProductionManager's event
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        // Also unsubscribe from manager events here if they might be destroyed before GameManager
         if (productionManager != null)
         {
             productionManager.OnTotalProductionRateChanged -= UpdateProductionRateDisplay;
         }
     }
 
-    void Start()
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        // Apply offline progress calculation *after* all managers are loaded and initialized
-        ApplyOfflineProduction();
-
-        // Get initial production rate and update display (if ProductionManager exists)
-        if (productionManager != null)
+        Debug.Log($"[GameManager] Scene Loaded: {scene.name}");
+        // Check if the loaded scene is the main game scene
+        if (scene.name == mainGameSceneName)
         {
-            UpdateProductionRateDisplay(productionManager.GetTotalProductionRatePerSecond());
+            Debug.Log("[GameManager] Main game scene loaded. Finding UI references...");
+            // Re-find essential UI references that exist IN THIS SCENE
+            FindSceneUIReferences();
+
+            // Re-subscribe to events from scene-specific managers if necessary
+            // (Assuming ProductionManager is DontDestroyOnLoad based on previous logic)
+            // If ProductionManager was scene-specific, you'd find it and subscribe here.
+            
+            // Update UI immediately after finding references
+            if (productionManager != null)
+            {
+                 // Unsubscribe first to prevent double-subscription if OnEnable also ran
+                productionManager.OnTotalProductionRateChanged -= UpdateProductionRateDisplay;
+                productionManager.OnTotalProductionRateChanged += UpdateProductionRateDisplay;
+                UpdateProductionRateDisplay(productionManager.GetTotalProductionRatePerSecond());
+            }
+            else
+            {
+                UpdateProductionRateDisplay(0);
+            }
+        }
+    }
+
+    void FindSceneUIReferences()
+    {
+        // Find Score Display - Be specific if multiple RectTransforms exist
+        // Option 1: Find by name (adjust "Counter" if needed)
+        GameObject counterGO = GameObject.Find("Counter"); // Assumes name is unique
+        if (counterGO != null)
+        {
+            scoreDisplayRectTransform = counterGO.GetComponent<RectTransform>();
+            if (scoreDisplayRectTransform == null) Debug.LogError("[GameManager] Found 'Counter' GameObject but it has no RectTransform!", counterGO);
+            else Debug.Log("[GameManager] Found scoreDisplayRectTransform on 'Counter' GameObject.", scoreDisplayRectTransform);
         }
         else
         {
-            // Optionally hide or set default text if no production manager
-            UpdateProductionRateDisplay(0); // Show 0/s if no production
-            // if (totalProductionRateText != null) totalProductionRateText.gameObject.SetActive(false);
+             Debug.LogError("[GameManager] Could not find GameObject named 'Counter' to get scoreDisplayRectTransform!");
+             scoreDisplayRectTransform = null; // Ensure it's null if not found
         }
 
-        // Initial UI updates for score/click value are now handled by their respective managers after LoadGame/InitializeManagers
+        // Find Total Production Rate Text - Be specific!
+        GameObject prodRateGO = GameObject.Find("ProductionRate"); // UPDATED NAME based on Hierarchy
+        if (prodRateGO != null)
+        {
+            totalProductionRateText = prodRateGO.GetComponent<TextMeshProUGUI>();
+            if (totalProductionRateText == null) Debug.LogError("[GameManager] Found 'ProductionRate' GameObject but it has no TextMeshProUGUI component!", prodRateGO);
+            else Debug.Log("[GameManager] Found totalProductionRateText on 'ProductionRate' GameObject.", totalProductionRateText);
+        }
+        else
+        {
+            Debug.LogError("[GameManager] Could not find GameObject named 'ProductionRate'! Please ensure it exists and the name matches exactly."); // UPDATED log message
+            totalProductionRateText = null; // Ensure null if not found
+        }
+
+        // IMPORTANT: Check if floatingTextManager also needs its references updated (e.g., its spawn parent canvas)
+        if (floatingTextManager != null)
+        {
+             floatingTextManager.FindSceneReferences(); // Assumes FloatingTextManager has a method to find its scene stuff
+        }
+    }
+
+    void Start()
+    {
+        // Apply offline progress calculation *after* all managers are loaded and initialized
+        // This should run after Awake and potentially after the first OnSceneLoaded
+        ApplyOfflineProduction();
+
+        // Initial UI update relies on OnSceneLoaded finding references first
+        // if (productionManager != null)
+        // {
+        //     UpdateProductionRateDisplay(productionManager.GetTotalProductionRatePerSecond());
+        // }
+        // else
+        // {
+        //     UpdateProductionRateDisplay(0); 
+        // }
     }
 
     // Method called when a click occurs
@@ -136,6 +203,8 @@ public class GameManager : MonoBehaviour
         scoreManager.AddScore(clickValue);
 
         // Show floating text using the value obtained from the ClickUpgradeManager
+        // Ensure scoreDisplayRectTransform is valid before calling ProcessClick if it relies on it indirectly
+        // The current call uses clickPosition, so it's okay
         floatingTextManager.ShowFloatingText(clickValue, clickPosition);
     }
 

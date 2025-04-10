@@ -119,23 +119,18 @@ public class ProductionManager : MonoBehaviour
                     // Check if the GameManager exists and necessary components are assigned
                     if (_gameManagerInstance != null) // Check GameManager first
                     {                       
-                        bool hasFtm = _gameManagerInstance.floatingTextManager != null;
-                        bool hasRect = _gameManagerInstance.scoreDisplayRectTransform != null;
+                        // Check if the specific components needed are valid IN THE CURRENT CONTEXT
+                        FloatingTextManager ftm = _gameManagerInstance.floatingTextManager;
+                        RectTransform scoreRect = _gameManagerInstance.scoreDisplayRectTransform; 
                         
-                        // Get FloatingTextManager via GameManager
-                        if (hasFtm && hasRect) // Now check components
+                        // Only show text if FTM exists AND the RectTransform target exists (implies we are in the correct scene)
+                        if (ftm != null && scoreRect != null) 
                         {
-                            _gameManagerInstance.floatingTextManager.ShowFloatingText(
+                            ftm.ShowFloatingText(
                                 scoreGeneratedThisTick,
-                                _gameManagerInstance.scoreDisplayRectTransform.anchoredPosition,
+                                scoreRect.anchoredPosition,
                                 prodData.feedbackColor
                             );
-                        }
-                        else 
-                        {
-                             // Log specifically why it failed inside the main scene check
-                             if (!hasFtm) Debug.LogError("[ProdManager] Cannot show floating text because GameManager.floatingTextManager reference is MISSING in Inspector!", _gameManagerInstance);
-                             if (!hasRect) Debug.LogError("[ProdManager] Cannot show floating text because GameManager.scoreDisplayRectTransform reference is MISSING in Inspector!", _gameManagerInstance);
                         }
                     }
                     // Optional: Log if the scene check failed
