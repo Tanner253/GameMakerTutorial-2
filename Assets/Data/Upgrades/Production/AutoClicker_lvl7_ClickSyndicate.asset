@@ -10,12 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b9fa273f40b9fe64eb343690c4f613cb, type: 3}
-  m_Name: AutoClicker_Lvl5_ClickEnterprise
+  m_Name: AutoClicker_lvl7_ClickSyndicate
   m_EditorClassIdentifier: 
-  upgradeName: Click Enterprise
-  description: 'So big, it needs its own HR department just for the clicking division. '
-  baseProductionAmount: 10
+  upgradeName: Click Syndicate
+  description: A shadowy organization pulling the strings of the global click-onomy.
+    Generates 40 clicks/Tick per level.
+  baseProductionAmount: 40
   tickRate: 5
-  baseCost: 400
-  costScaleFactor: 1.18
-  feedbackColor: {r: 0.10208259, g: 0.5849056, b: 0.123220965, a: 1}
+  baseCost: 1600
+  costScaleFactor: 1.182
+  feedbackColor: {r: 0.5277171, g: 0.0141509175, b: 1, a: 1}

@@ -387,58 +387,38 @@ public class ProductionManager : MonoBehaviour
         }
     }
 
-    // NEW: Method to calculate and apply offline progress
+    // NEW Method: Calculates offline earnings without applying them
+    public decimal CalculateOfflineEarnings(float offlineSeconds)
+    {
+        if (offlineSeconds <= 0) return 0M;
+
+        // Use the already calculated total rate per second
+        decimal ratePerSecond = GetTotalProductionRatePerSecond(); 
+        decimal totalScoreEarned = ratePerSecond * (decimal)offlineSeconds;
+
+        // Apply any potential caps here if needed (e.g., based on max offline time)
+
+        return totalScoreEarned;
+    }
+
+    // OLD Method: Kept for reference or potential internal use, 
+    // but GameManager should now use CalculateOfflineEarnings
     public void ApplyOfflineProgress(long lastSaveTimestampTicks)
     {
-        Debug.Log($"[OfflineProgress] Attempting calculation. LastSaveTicks: {lastSaveTimestampTicks}");
-        if (lastSaveTimestampTicks == 0) {
-            Debug.Log("[OfflineProgress] First load or no valid timestamp. Skipping calculation.");
-            return; // Don't calculate if it's the first ever load
-        }
+        if (lastSaveTimestampTicks == 0) return; // Cannot calculate without a previous save time
 
-        DateTime lastSaveTime = new DateTime(lastSaveTimestampTicks, DateTimeKind.Utc);
-        DateTime currentTime = DateTime.UtcNow;
-        TimeSpan timeElapsed = currentTime - lastSaveTime;
-        Debug.Log($"[OfflineProgress] Last Save Time: {lastSaveTime:O}, Current Time: {currentTime:O}");
+        TimeSpan offlineTime = DateTime.UtcNow - new DateTime(lastSaveTimestampTicks, DateTimeKind.Utc);
+        float offlineSeconds = (float)offlineTime.TotalSeconds;
 
-        // --- Sanity Check / Cap --- 
-        double maxOfflineHours = 12.0; // Set your desired cap here (e.g., 12 hours)
-        double elapsedHours = timeElapsed.TotalHours;
-        Debug.Log($"[OfflineProgress] Elapsed Hours Raw: {elapsedHours:F4}");
+        if (offlineSeconds <= 10) return; // Ignore short times
 
-        if (elapsedHours <= 0) {
-             Debug.Log("[OfflineProgress] Elapsed time is zero or negative. Skipping calculation.");
-             return; // Time went backwards or no time passed
-        }
+        decimal totalScoreEarned = CalculateOfflineEarnings(offlineSeconds);
 
-        double hoursToCredit = Math.Min(elapsedHours, maxOfflineHours);
-        // Optional: Log if capping occurred
-        if (elapsedHours > maxOfflineHours)
+        if (totalScoreEarned > 0)
         {
-            Debug.Log($"[OfflineProgress] Offline time ({elapsedHours:F1} hrs) exceeded cap ({maxOfflineHours} hrs). Crediting capped amount.");
-        }
-        Debug.Log($"[OfflineProgress] Hours to Credit (Capped): {hoursToCredit:F4}");
-        // --------------------------
-
-        decimal currentRatePerSecond = GetTotalProductionRatePerSecond();
-        Debug.Log($"[OfflineProgress] Current Prod Rate Per Second: {currentRatePerSecond:F4}");
-
-        if (currentRatePerSecond <= 0) {
-             Debug.Log("[OfflineProgress] Production rate is zero. No progress to apply.");
-             return; // No production rate, nothing to add
-        }
-
-        decimal scoreGenerated = currentRatePerSecond * (decimal)(hoursToCredit * 3600.0);
-        Debug.Log($"[OfflineProgress] Calculated Score Generated: {NumberFormatter.FormatNumber(scoreGenerated)} ({scoreGenerated})");
-
-        if (scoreGenerated > 0 && ScoreManager.Instance != null)
-        {
-            Debug.Log($"[OfflineProgress] Applying offline progress: Crediting {NumberFormatter.FormatNumber(scoreGenerated)} score for {hoursToCredit:F1} hours offline.");
-            ScoreManager.Instance.AddScore(scoreGenerated); // Add score without feedback noise
-        }
-        else if (ScoreManager.Instance == null)
-        {
-             Debug.LogError("[OfflineProgress] ScoreManager.Instance is null! Cannot add score.");
+            Debug.Log($"[ProductionManager.ApplyOfflineProgress] Awarding {totalScoreEarned:F0} score for {offlineSeconds:F0}s offline time.");
+            ScoreManager.Instance?.AddScore(totalScoreEarned);
+            // Optionally show floating text here if needed directly from ProductionManager
         }
     }
 

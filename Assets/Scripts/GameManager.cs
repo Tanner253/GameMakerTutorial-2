@@ -25,10 +25,11 @@ public class GameManager : MonoBehaviour
     public ProductionManager productionManager; // Keep reference
     public SaveLoadManager saveLoadManager; // ADDED
     public PrestigeManager prestigeManager; // NEW
+    public FloatingTextManager floatingTextManager; // Make public again
+    private OfflineProgressAlertUI offlineAlertUI; // NEW reference
 
     // --- UI References (Only those not specific to other managers) ---
     [Header("UI References")]
-    public FloatingTextManager floatingTextManager;
     [Tooltip("ASSIGN IN INSPECTOR! This will be re-found on scene load if needed.")]
     public RectTransform scoreDisplayRectTransform; // Still needed for floating text position
     [Tooltip("ASSIGN IN INSPECTOR! This will be re-found on scene load if needed.")]
@@ -62,6 +63,13 @@ public class GameManager : MonoBehaviour
         if (saveLoadManager == null) saveLoadManager = FindFirstObjectByType<SaveLoadManager>();
         if (floatingTextManager == null) floatingTextManager = FindFirstObjectByType<FloatingTextManager>();
         if (prestigeManager == null) prestigeManager = FindFirstObjectByType<PrestigeManager>(); 
+
+        // NEW: Find the offline alert UI (assuming it's on the same GameObject or easily findable)
+        offlineAlertUI = FindFirstObjectByType<OfflineProgressAlertUI>(); 
+        if (offlineAlertUI == null)
+        {
+            Debug.LogWarning("GameManager could not find OfflineProgressAlertUI. Offline alerts will not be shown.");
+        }
 
         // Null check managers after attempting to find them
         if (scoreManager == null) Debug.LogError("GameManager could not find ScoreManager!");
@@ -279,15 +287,26 @@ public class GameManager : MonoBehaviour
     // NEW: Method to handle offline calculation call
     void ApplyOfflineProduction()
     {
-        if (productionManager != null && saveLoadManager != null)
+        long lastSaveTicks = saveLoadManager?.GetLastLoadedTimestampTicks() ?? 0;
+        if (lastSaveTicks == 0) return; // No previous save time
+
+        TimeSpan offlineTime = DateTime.UtcNow - new DateTime(lastSaveTicks, DateTimeKind.Utc);
+        Debug.Log($"[Offline Calc] Offline time: {offlineTime.TotalSeconds:F0} seconds");
+
+        if (offlineTime.TotalSeconds <= 10) return; // Ignore very short offline times
+
+        // Calculate offline earnings (delegate to ProductionManager)
+        decimal offlineScoreEarned = productionManager?.CalculateOfflineEarnings((float)offlineTime.TotalSeconds) ?? 0M;
+
+        if (offlineScoreEarned > 0)
         {
-            long lastTimestamp = saveLoadManager.GetLastLoadedTimestampTicks();
-            Debug.Log($"[GameManager.Start] Retrieved lastSaveTimestampTicks: {lastTimestamp}");
-            productionManager.ApplyOfflineProgress(lastTimestamp);
-        }
-        else
-        {
-            Debug.LogWarning("Cannot apply offline progress: ProductionManager or SaveLoadManager not found.");
+            // Add score directly (or maybe show breakdown?)
+            scoreManager?.AddScore(offlineScoreEarned);
+            Debug.Log($"[Offline Calc] Awarded {offlineScoreEarned:F0} score for offline time.");
+
+            // NEW: Show the alert UI
+            Debug.Log($"[Offline Calc] Checking offlineAlertUI reference before calling ShowAlert. Is null? {offlineAlertUI == null}");
+            offlineAlertUI?.ShowAlert(offlineScoreEarned);
         }
     }
 }

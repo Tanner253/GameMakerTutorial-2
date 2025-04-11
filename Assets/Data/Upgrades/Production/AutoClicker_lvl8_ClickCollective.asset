@@ -10,12 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b9fa273f40b9fe64eb343690c4f613cb, type: 3}
-  m_Name: AutoClicker_Lvl5_ClickEnterprise
+  m_Name: AutoClicker_lvl8_ClickCollective
   m_EditorClassIdentifier: 
-  upgradeName: Click Enterprise
-  description: 'So big, it needs its own HR department just for the clicking division. '
-  baseProductionAmount: 10
+  upgradeName: Click Collective
+  description: "A hive mind entirely devoted to optimized clicking procedures. Generates
+    80 clicks/Tick per level.\t\t"
+  baseProductionAmount: 80
   tickRate: 5
-  baseCost: 400
-  costScaleFactor: 1.18
-  feedbackColor: {r: 0.10208259, g: 0.5849056, b: 0.123220965, a: 1}
+  baseCost: 3200
+  costScaleFactor: 1.188
+  feedbackColor: {r: 0.015686274, g: 0.7108404, b: 1, a: 1}

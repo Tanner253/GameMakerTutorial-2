@@ -10,12 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b9fa273f40b9fe64eb343690c4f613cb, type: 3}
-  m_Name: AutoClicker_Lvl5_ClickEnterprise
+  m_Name: AutoClicker_Lvl6_ClickEmpire
   m_EditorClassIdentifier: 
-  upgradeName: Click Enterprise
-  description: 'So big, it needs its own HR department just for the clicking division. '
-  baseProductionAmount: 10
+  upgradeName: Click Conglomerate
+  description: A multi-industry giant focused on synergy... and clicking. Generates
+    20 clicks/Tick per level.
+  baseProductionAmount: 20
   tickRate: 5
-  baseCost: 400
+  baseCost: 800
   costScaleFactor: 1.18
-  feedbackColor: {r: 0.10208259, g: 0.5849056, b: 0.123220965, a: 1}
+  feedbackColor: {r: 0.46226418, g: 0, b: 0.4123565, a: 1}

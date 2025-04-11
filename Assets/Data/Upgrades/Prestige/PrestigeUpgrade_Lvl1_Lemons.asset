@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a4463f80bbd201f499a0dbbe596ca328, type: 3}
-  m_Name: MemeMintAccess
+  m_Name: PrestigeUpgrade_Lvl1_Lemons
   m_EditorClassIdentifier: 
-  upgradeName: PLACEHOLDER
-  description: WHEN WILL ALL THESE BUGS BE FIXED?!?!?
-  baseCostGoldBars: 100000
-  costScaleFactor: 1.5
-  clickBonusPercentPerLevel: 5
+  upgradeName: Lemons
+  description: "Occasionally Rains Lemons. Click the Lemons for a balance boost!\t"
+  baseCostGoldBars: 1000
+  costScaleFactor: 1.68
+  clickBonusPercentPerLevel: 1
   isUniqueUnlock: 1
-  requiredPrestigeLevel: 3
+  requiredPrestigeLevel: 1
