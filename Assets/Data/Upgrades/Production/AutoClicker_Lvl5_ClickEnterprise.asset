@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   upgradeName: Click Enterprise
   description: 'So big, it needs its own HR department just for the clicking division. '
-  baseProductionAmount: 10
-  tickRate: 5
-  baseCost: 400
-  costScaleFactor: 1.18
+  baseProductionAmount: 100
+  tickRate: 30
+  baseCost: 1500
+  costScaleFactor: 1.35
   feedbackColor: {r: 0.10208259, g: 0.5849056, b: 0.123220965, a: 1}

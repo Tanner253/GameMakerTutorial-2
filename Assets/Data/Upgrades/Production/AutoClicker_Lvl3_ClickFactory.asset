@@ -15,8 +15,8 @@ MonoBehaviour:
   upgradeName: Click Factory
   description: Industrial-scale clicking operations. Generates 1.0 clicks/Tick per
     level.
-  baseProductionAmount: 1
-  tickRate: 3
-  baseCost: 50
-  costScaleFactor: 1.17
+  baseProductionAmount: 15
+  tickRate: 2
+  baseCost: 200
+  costScaleFactor: 1.25
   feedbackColor: {r: 1, g: 0.019583862, b: 0, a: 1}

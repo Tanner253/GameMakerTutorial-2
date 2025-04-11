@@ -15,8 +15,8 @@ MonoBehaviour:
   upgradeName: Click Farm
   description: Employs several... enthusiastic clickers. Generates 5 clicks per second
     per level.
-  baseProductionAmount: 0.5
-  tickRate: 2
-  baseCost: 20
-  costScaleFactor: 1.16
+  baseProductionAmount: 5
+  tickRate: 1.5
+  baseCost: 50
+  costScaleFactor: 1.2
   feedbackColor: {r: 1, g: 0.39164284, b: 0, a: 1}

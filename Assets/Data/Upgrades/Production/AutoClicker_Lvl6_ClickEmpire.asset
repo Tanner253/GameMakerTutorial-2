@@ -15,8 +15,8 @@ MonoBehaviour:
   upgradeName: Click Conglomerate
   description: A multi-industry giant focused on synergy... and clicking. Generates
     20 clicks/Tick per level.
-  baseProductionAmount: 20
-  tickRate: 5
-  baseCost: 800
-  costScaleFactor: 1.18
+  baseProductionAmount: 250
+  tickRate: 3.5
+  baseCost: 400
+  costScaleFactor: 1.4
   feedbackColor: {r: 0.46226418, g: 0, b: 0.4123565, a: 1}

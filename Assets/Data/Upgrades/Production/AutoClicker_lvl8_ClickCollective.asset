@@ -15,8 +15,8 @@ MonoBehaviour:
   upgradeName: Click Collective
   description: "A hive mind entirely devoted to optimized clicking procedures. Generates
     80 clicks/Tick per level.\t\t"
-  baseProductionAmount: 80
-  tickRate: 5
-  baseCost: 3200
-  costScaleFactor: 1.188
+  baseProductionAmount: 1500
+  tickRate: 4.5
+  baseCost: 25000
+  costScaleFactor: 1.5
   feedbackColor: {r: 0.015686274, g: 0.7108404, b: 1, a: 1}

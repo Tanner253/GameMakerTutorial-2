@@ -15,8 +15,8 @@ MonoBehaviour:
   upgradeName: Click Singularity
   description: Algorithms designing better clicking algorithms at an exponential
     rate. Generates 160 clicks/Tick per level.
-  baseProductionAmount: 160
+  baseProductionAmount: 4000
   tickRate: 5
-  baseCost: 6400
-  costScaleFactor: 1.95
+  baseCost: 60000
+  costScaleFactor: 1.55
   feedbackColor: {r: 0, g: 1, b: 0.4700992, a: 1}

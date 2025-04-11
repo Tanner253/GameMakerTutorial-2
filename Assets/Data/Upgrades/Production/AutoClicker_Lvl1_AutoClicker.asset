@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: AutoClicker_Lvl1_AutoClicker
   m_EditorClassIdentifier: 
   upgradeName: Auto-Clicker
-  description: Generates 0.1 Clicks Per Tick.
-  baseProductionAmount: 0.1
+  description: Generates 1 Clicks Per Tick.
+  baseProductionAmount: 1
   tickRate: 1
   baseCost: 10
   costScaleFactor: 1.15

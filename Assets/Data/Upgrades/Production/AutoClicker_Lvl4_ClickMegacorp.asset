@@ -15,8 +15,8 @@ MonoBehaviour:
   upgradeName: Click MegaCorp
   description: A multinational corporation dedicated to clicking. Generates 5.0 clicks/Tick
     per level.
-  baseProductionAmount: 5
-  tickRate: 5
-  baseCost: 200
-  costScaleFactor: 1.18
+  baseProductionAmount: 40
+  tickRate: 2.5
+  baseCost: 600
+  costScaleFactor: 1.3
   feedbackColor: {r: 1, g: 0, b: 0.7929859, a: 1}

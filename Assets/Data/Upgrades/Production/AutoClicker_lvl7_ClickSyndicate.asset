@@ -15,8 +15,8 @@ MonoBehaviour:
   upgradeName: Click Syndicate
   description: A shadowy organization pulling the strings of the global click-onomy.
     Generates 40 clicks/Tick per level.
-  baseProductionAmount: 40
-  tickRate: 5
-  baseCost: 1600
-  costScaleFactor: 1.182
+  baseProductionAmount: 600
+  tickRate: 4
+  baseCost: 10000
+  costScaleFactor: 1.45
   feedbackColor: {r: 0.5277171, g: 0.0141509175, b: 1, a: 1}

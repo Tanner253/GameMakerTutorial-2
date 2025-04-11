@@ -15,8 +15,8 @@ MonoBehaviour:
   upgradeName: Click Deity
   description: Transcends physical limitations to click across dimensions. Generates
     320 clicks/Tick per level.
-  baseProductionAmount: 320
-  tickRate: 5
-  baseCost: 12800
-  costScaleFactor: 2
+  baseProductionAmount: 10000
+  tickRate: 6
+  baseCost: 150000
+  costScaleFactor: 1.6
   feedbackColor: {r: 0.15869188, g: 0, b: 1, a: 1}
