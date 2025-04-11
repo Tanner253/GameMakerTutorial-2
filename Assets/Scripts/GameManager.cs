@@ -11,6 +11,9 @@ public class GameManager : MonoBehaviour
     // Singleton pattern instance
     public static GameManager Instance { get; private set; }
 
+    // Session tracking
+    private DateTime sessionStartTime; // Track when this game session started
+
     // --- Global Scaling Factor (Remains here for now, could move later) ---
     [Header("Global Settings")]
     [Tooltip(
@@ -45,6 +48,8 @@ public class GameManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject); // Optional: Keep GameManager across scenes
+            sessionStartTime = DateTime.UtcNow; // Record session start time
+            Debug.Log($"[GameManager] New session started at: {sessionStartTime}");
         }
         else
         {
@@ -179,6 +184,17 @@ public class GameManager : MonoBehaviour
         {
              floatingTextManager.FindSceneReferences(); // Assumes FloatingTextManager has a method to find its scene stuff
         }
+
+        // Find Offline Alert UI - Should be found each time the scene loads
+        offlineAlertUI = FindFirstObjectByType<OfflineProgressAlertUI>(FindObjectsInactive.Include); // Include inactive because it should be inactive by default
+        if (offlineAlertUI == null)
+        {
+             Debug.LogWarning("[GameManager] Could not find OfflineProgressAlertUI in the scene.");
+        }
+        else
+        {
+             Debug.Log("[GameManager] Found OfflineProgressAlertUI in the scene.", offlineAlertUI.gameObject);
+        }
     }
 
     void Start()
@@ -290,23 +306,43 @@ public class GameManager : MonoBehaviour
         long lastSaveTicks = saveLoadManager?.GetLastLoadedTimestampTicks() ?? 0;
         if (lastSaveTicks == 0) return; // No previous save time
 
-        TimeSpan offlineTime = DateTime.UtcNow - new DateTime(lastSaveTicks, DateTimeKind.Utc);
-        Debug.Log($"[Offline Calc] Offline time: {offlineTime.TotalSeconds:F0} seconds");
+        DateTime lastSaveTimeUtc = new DateTime(lastSaveTicks, DateTimeKind.Utc);
+        Debug.Log($"[GameManager.ApplyOfflineProduction] Last Save: {lastSaveTimeUtc}");
 
-        if (offlineTime.TotalSeconds <= 10) return; // Ignore very short offline times
+        // Calculate offline time based on the last save timestamp
+        TimeSpan offlineTime = DateTime.UtcNow - lastSaveTimeUtc;
+        float offlineSeconds = (float)offlineTime.TotalSeconds;
 
-        // Calculate offline earnings (delegate to ProductionManager)
-        decimal offlineScoreEarned = productionManager?.CalculateOfflineEarnings((float)offlineTime.TotalSeconds) ?? 0M;
+        Debug.Log($"[GameManager.ApplyOfflineProduction] Last Save: {lastSaveTimeUtc}, Current Time: {DateTime.UtcNow}, Session Start: {sessionStartTime}, Offline Seconds: {offlineSeconds}");
 
-        if (offlineScoreEarned > 0)
+        // *** KEY CHANGE: Only calculate offline earnings if the last save was BEFORE the current session started ***
+        if (lastSaveTimeUtc < sessionStartTime && offlineSeconds > 10) // Check against session start time and threshold
         {
-            // Add score directly (or maybe show breakdown?)
-            scoreManager?.AddScore(offlineScoreEarned);
-            Debug.Log($"[Offline Calc] Awarded {offlineScoreEarned:F0} score for offline time.");
+            Debug.Log($"[GameManager.ApplyOfflineProduction] Last save was before session start. Calculating offline earnings...");
+            // Calculate earnings using ProductionManager method
+            decimal offlineEarnings = productionManager.CalculateOfflineEarnings(offlineSeconds);
 
-            // NEW: Show the alert UI
-            Debug.Log($"[Offline Calc] Checking offlineAlertUI reference before calling ShowAlert. Is null? {offlineAlertUI == null}");
-            offlineAlertUI?.ShowAlert(offlineScoreEarned);
+            if (offlineEarnings > 0)
+            {
+                Debug.Log($"[GameManager.ApplyOfflineProduction] Offline earnings calculated: {offlineEarnings}. Awarding score and showing alert.");
+                // Award the score
+                scoreManager?.AddScore(offlineEarnings);
+
+                // Show the offline progress alert UI
+                offlineAlertUI?.ShowAlert(offlineEarnings);
+            }
+            else
+            {
+                Debug.Log("[GameManager.ApplyOfflineProduction] Calculated offline earnings were zero or less.");
+            }
+        }
+        else if (lastSaveTimeUtc >= sessionStartTime)
+        {
+             Debug.Log("[GameManager.ApplyOfflineProduction] Last save time is within the current session. Skipping offline progress alert.");
+        }
+        else // offlineSeconds <= 10
+        {
+             Debug.Log("[GameManager.ApplyOfflineProduction] Offline time ({offlineSeconds}s) is below threshold (10s). Skipping offline progress.");
         }
     }
 }

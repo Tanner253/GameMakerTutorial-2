@@ -401,27 +401,6 @@ public class ProductionManager : MonoBehaviour
         return totalScoreEarned;
     }
 
-    // OLD Method: Kept for reference or potential internal use, 
-    // but GameManager should now use CalculateOfflineEarnings
-    public void ApplyOfflineProgress(long lastSaveTimestampTicks)
-    {
-        if (lastSaveTimestampTicks == 0) return; // Cannot calculate without a previous save time
-
-        TimeSpan offlineTime = DateTime.UtcNow - new DateTime(lastSaveTimestampTicks, DateTimeKind.Utc);
-        float offlineSeconds = (float)offlineTime.TotalSeconds;
-
-        if (offlineSeconds <= 10) return; // Ignore short times
-
-        decimal totalScoreEarned = CalculateOfflineEarnings(offlineSeconds);
-
-        if (totalScoreEarned > 0)
-        {
-            Debug.Log($"[ProductionManager.ApplyOfflineProgress] Awarding {totalScoreEarned:F0} score for {offlineSeconds:F0}s offline time.");
-            ScoreManager.Instance?.AddScore(totalScoreEarned);
-            // Optionally show floating text here if needed directly from ProductionManager
-        }
-    }
-
     private void HandlePrestigeCountChanged(int newPrestigeCount) // Method to handle event
     {
         // Recalculate total rate when prestige level changes

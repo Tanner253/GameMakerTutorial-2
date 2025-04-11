@@ -10,22 +10,17 @@ public class OfflineProgressAlertUI : MonoBehaviour
     [Tooltip("Assign the TextMeshProUGUI component that will display the message.")]
     [SerializeField] private TextMeshProUGUI messageText; 
 
-    [Header("Settings")]
-    [SerializeField] private float displayDuration = 10.0f; // How long to show the alert - CHANGED DEFAULT TO 10s
-
-    private Coroutine _hideCoroutine;
-
     void Start()
     {
-        // REMOVED: Ensure the panel is hidden initially
-        // if (alertPanel != null)
-        // {
-        //     alertPanel.SetActive(false);
-        // }
-        // else ... (Keep error check)
-        if (alertPanel == null)
+        // Ensure the panel is hidden initially
+        if (alertPanel != null)
         {
-            Debug.LogError("OfflineProgressAlertUI: Alert Panel reference not set in Inspector!", this);
+            Debug.Log($"[OfflineProgressAlertUI.Start] Found alertPanel reference ({alertPanel.name}). Setting inactive.", alertPanel);
+            alertPanel.SetActive(false);
+        }
+        else
+        {
+            Debug.LogError("OfflineProgressAlertUI: Alert Panel reference not set in Inspector! Panel cannot be hidden on Start.", this);
         }
         if (messageText == null)
         {
@@ -51,28 +46,19 @@ public class OfflineProgressAlertUI : MonoBehaviour
         // Format the message using the NumberFormatter utility
         messageText.text = $"You earned {NumberFormatter.FormatNumber(offlineEarnings)} nuggets while away!";
 
-        // Stop any previous hide coroutine if it was running
-        if (_hideCoroutine != null)
-        {
-            StopCoroutine(_hideCoroutine);
-        }
-
-        // Show the panel and start the timer to hide it
+        // Show the panel 
         Debug.Log($"[OfflineProgressAlertUI] Activating panel object: {alertPanel.name}");
         alertPanel.SetActive(true);
         Debug.Log($"[OfflineProgressAlertUI] Panel activeSelf state after SetActive(true): {alertPanel.activeSelf}");
-        _hideCoroutine = StartCoroutine(HideAfterDelay());
     }
 
-    private IEnumerator HideAfterDelay()
+    // Public method to be called by a UI Button's OnClick event
+    public void DismissAlert()
     {
-        Debug.Log($"[OfflineProgressAlertUI] Coroutine started. Waiting for {displayDuration} seconds."); // ADD THIS LOG
-        yield return new WaitForSeconds(displayDuration);
-        Debug.Log("[OfflineProgressAlertUI] Wait finished. Deactivating panel."); // ADD THIS LOG
-        if (alertPanel != null) // Add null check before deactivating
+        Debug.Log("[OfflineProgressAlertUI] Dismiss button clicked.");
+        if (alertPanel != null)
         {
-             alertPanel.SetActive(false);
+            alertPanel.SetActive(false);
         }
-        _hideCoroutine = null; // Reset coroutine reference
     }
 } 
