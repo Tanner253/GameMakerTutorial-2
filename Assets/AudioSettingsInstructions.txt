@@ -1,0 +1,67 @@
+=====================================
+AUDIO SETTINGS IMPLEMENTATION GUIDE
+=====================================
+
+This document explains how to add audio volume controls to your game's settings panel.
+
+OVERVIEW:
+---------
+Two scripts have been added to implement audio volume controls:
+1. AudioSettingsPanel.cs - Creates and manages the sliders and labels
+2. AudioSettingsUI.cs - Handles the slider logic and connects to AudioManager
+
+The AudioManager has been updated to support separate volume controls for SFX and music categories.
+
+SETUP INSTRUCTIONS:
+------------------
+
+OPTION 1: AUTOMATIC SETUP (RECOMMENDED)
+---------------------------------------
+1. Open your scene in the Unity Editor
+2. Select your "SettingsPanel" GameObject in the Hierarchy
+3. Add the "AudioSettingsPanel" component to it
+4. Configure the settings in the Inspector (optional):
+   - You can adjust spacing, font settings, and other visual properties 
+   - You can leave contentParent empty to use the panel itself as the parent
+
+The AudioSettingsPanel will automatically create all necessary UI elements at runtime.
+
+OPTION 2: MANUAL SETUP
+----------------------
+If you prefer to set up the UI elements manually:
+
+1. Create two sliders in your settings panel
+2. Add the "AudioSettingsUI" component to your settings panel
+3. Assign the sliders to the appropriate fields in the Inspector
+4. Optionally create and assign TextMeshProUGUI components for displaying the volume percentages
+
+USAGE:
+------
+- The music and SFX volume settings will be saved using PlayerPrefs
+- Volume settings are automatically loaded when the game starts
+- You can add new audio sources to the respective categories using:
+  AudioManager.Instance.RegisterAudioSource(myAudioSource, isMusic);
+
+SCALABILITY:
+-----------
+- The AudioManager maintains separate lists for SFX and music sources
+- When new audio sources are added, they automatically use the right volume setting
+- To add a new audio source at runtime, use the RegisterAudioSource method
+
+If you need additional audio categories beyond SFX and music, you can extend the AudioManager class.
+
+====================
+TROUBLESHOOTING:
+====================
+
+1. "AudioManager instance not found"
+   - Make sure the AudioManager exists in your scene
+   - Check that it's properly set up as a singleton
+
+2. Sliders not affecting volume
+   - Check the Console for any errors
+   - Verify that the AudioManager is correctly categorizing your audio sources
+
+3. UI elements not appearing
+   - If using automatic setup, check that the AudioSettingsPanel component is attached
+   - If using manual setup, verify that all references are properly assigned 

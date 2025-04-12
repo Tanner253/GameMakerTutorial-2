@@ -49,6 +49,7 @@ public class ReturnToMainScene : MonoBehaviour
     /// </summary>
     public void GoToMainScene()
     {
+        AudioManager.Instance?.PlayClickSound(); // Play click sound
         // Basic check if the scene name is set
         if (string.IsNullOrEmpty(mainSceneName))
         {

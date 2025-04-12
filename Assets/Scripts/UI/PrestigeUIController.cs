@@ -231,6 +231,7 @@ public class PrestigeUIController : MonoBehaviour
 
     void ShowPrestigePanel()
     {
+        AudioManager.Instance?.PlayClickSound(); // Play click sound
         prestigeShopPanel?.SetActive(false);
         prestigeNavBar?.SetActive(false);
 
@@ -246,19 +247,22 @@ public class PrestigeUIController : MonoBehaviour
 
     void HidePrestigePanel()
     {
+        AudioManager.Instance?.PlayClickSound(); // Play click sound
         prestigePanel?.SetActive(false);
         prestigeNavBar?.SetActive(true);
     }
 
     void HandleConfirmPrestige()
     {
+        AudioManager.Instance?.PlayClickSound(); // Play click sound
         _prestigeManager?.PerformPrestige();
-        HidePrestigePanel(); // Hide the panel after confirming
-        // UI should update automatically via events
+        HidePrestigePanel(); // Hide panel after confirming
+        // Consider adding UI feedback here (e.g., a temporary message)
     }
 
     void ShowPrestigeShop()
     {
+        AudioManager.Instance?.PlayClickSound(); // Play click sound
         prestigePanel?.SetActive(false);
         prestigeNavBar?.SetActive(false);
 
@@ -268,65 +272,48 @@ public class PrestigeUIController : MonoBehaviour
 
     void HidePrestigeShop()
     {
+        AudioManager.Instance?.PlayClickSound(); // Play click sound
         prestigeShopPanel?.SetActive(false);
         prestigeNavBar?.SetActive(true);
     }
 
     void PopulatePrestigeShop()
     {
-        if (_prestigeManager == null)
-            Debug.LogError("[PopulatePrestigeShop] PrestigeManager is NULL!");
-        if (upgradeListContainer == null)
-            Debug.LogError("[PopulatePrestigeShop] UpgradeListContainer is NULL!");
-        if (prestigeUpgradeButtonPrefab == null)
-            Debug.LogError("[PopulatePrestigeShop] PrestigeUpgradeButtonPrefab is NULL!");
-
-        if (
-            _prestigeManager == null
-            || upgradeListContainer == null
-            || prestigeUpgradeButtonPrefab == null
-        )
+        if (_prestigeManager == null || upgradeListContainer == null || prestigeUpgradeButtonPrefab == null)
         {
-            Debug.LogWarning("[PopulatePrestigeShop] Exiting early due to null reference.");
+            Debug.LogError("[PrestigeUIController] Cannot populate shop: Missing manager, container, or prefab reference.");
             return;
         }
 
+        // Clear existing buttons first (important if repopulating)
         foreach (Transform child in upgradeListContainer)
         {
             Destroy(child.gameObject);
         }
 
-        if (_prestigeManager.availablePrestigeUpgradesData == null)
+        // Create a button for each available prestige upgrade
+        if (_prestigeManager.availablePrestigeUpgradesData != null)
         {
-            Debug.LogError(
-                "[PopulatePrestigeShop] PrestigeManager.availablePrestigeUpgradesData is NULL!"
-            );
-            return;
+            Debug.Log($"[PrestigeUIController] Populating shop with {_prestigeManager.availablePrestigeUpgradesData.Count} upgrades.");
+            foreach (PrestigeUpgradeData upgradeData in _prestigeManager.availablePrestigeUpgradesData)
+            {
+                if (upgradeData == null) continue;
+
+                GameObject buttonGO = Instantiate(prestigeUpgradeButtonPrefab, upgradeListContainer);
+                PrestigeUpgradeButtonUI buttonUI = buttonGO.GetComponent<PrestigeUpgradeButtonUI>();
+                if (buttonUI != null)
+                {
+                    buttonUI.Setup(upgradeData, _prestigeManager);
+                }
+                else
+                {
+                    Debug.LogError($"[PrestigeUIController] Prestige Upgrade Button Prefab is missing the PrestigeUpgradeButtonUI script!", buttonGO);
+                }
+            }
         }
-
-        foreach (var upgradeData in _prestigeManager.availablePrestigeUpgradesData)
+         else
         {
-            if (upgradeData == null)
-            {
-                Debug.LogWarning(
-                    "[PopulatePrestigeShop] Found NULL entry in upgrade data list. Skipping."
-                );
-                continue;
-            }
-
-            GameObject buttonGO = Instantiate(prestigeUpgradeButtonPrefab, upgradeListContainer);
-            PrestigeUpgradeButtonUI buttonUI = buttonGO.GetComponent<PrestigeUpgradeButtonUI>();
-            if (buttonUI != null)
-            {
-                buttonUI.Setup(upgradeData, _prestigeManager);
-            }
-            else
-            {
-                Debug.LogError(
-                    $"[PopulatePrestigeShop] Instantiated PrestigeUpgradeButtonPrefab is MISSING PrestigeUpgradeButtonUI component! Prefab: {prestigeUpgradeButtonPrefab.name}",
-                    buttonGO
-                );
-            }
+            Debug.LogWarning("[PrestigeUIController] PrestigeManager's availablePrestigeUpgradesData list is null.");
         }
     }
 

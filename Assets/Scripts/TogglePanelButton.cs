@@ -47,6 +47,7 @@ public class TogglePanelButton : MonoBehaviour
     // Public method to be called by the button's onClick event
     public void TogglePanel()
     {
+        AudioManager.Instance?.PlayClickSound(); // Play click sound
         if (panelToToggle != null)
         {
             bool isPanelNowActive = !panelToToggle.activeSelf;

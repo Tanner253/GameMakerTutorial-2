@@ -93,12 +93,12 @@ public class SaveLoadManager : MonoBehaviour
             }
             catch (ArgumentException argEx) // Specific exception for JsonUtility failures
             {
-                // Debug.LogError($"[Load] Error deserializing JSON: {argEx.Message}. JSON content was: \n{json ?? "<Decryption Failed>"}\nLoading default game state.");
+                Debug.LogError($"[Load] Error deserializing JSON: {argEx.ToString()}. JSON content was: \n{json ?? "<Decryption Failed>"}\nLoading default game state.", this);
                 loadedData = new SaveData(); // Ensure we load defaults on JSON error
             }
             catch (Exception ex) // Catch other potential errors (IO, etc.)
             {
-                 // Debug.LogError($"[Load] General error loading/processing save file: {ex.Message}. Loading default game state.");
+                 Debug.LogError($"[Load] General error loading/processing save file: {ex.ToString()}. Loading default game state.", this);
                  loadedData = null; // Ensure we fall through to default creation
             }
         }
@@ -171,7 +171,7 @@ public class SaveLoadManager : MonoBehaviour
             }
             catch (Exception ex)
             {
-                 // Debug.LogError($"SaveLoadManager: Failed to write save file: {ex.Message}");
+                 Debug.LogError($"SaveLoadManager: Failed to write save file: {ex.ToString()}", this);
             }
         }
         else
@@ -196,7 +196,7 @@ public class SaveLoadManager : MonoBehaviour
             }
             catch (Exception ex)
             {
-                // Debug.LogError($"SaveLoadManager: Failed to delete save file: {ex.Message}");
+                Debug.LogError($"SaveLoadManager: Failed to delete save file: {ex.ToString()}", this);
             }
         }
         else

@@ -248,18 +248,24 @@ public class ClickUpgradeManager : MonoBehaviour
                  continue;
             }
 
-            if(state.upgradeDataRef is PrestigeUpgradeData prestigeData)
+            // Cast to PrestigeUpgradeData and check Effect Type
+            if (state.upgradeDataRef is PrestigeUpgradeData prestigeData)
             {
-                if (prestigeData.clickBonusPercentPerLevel > 0)
-                {
-                    permanentClickBonusPercent += (decimal)prestigeData.clickBonusPercentPerLevel * state.level;
-                    // Debug.Log($"[ClickUpgradeManager] Adding { (decimal)prestigeData.clickBonusPercentPerLevel * state.level }% from {prestigeData.name} (Level {state.level})");
-                }
+                 if(prestigeData.effectType == PrestigeEffectType.ClickMultiplier && state.level > 0)
+                 {
+                    // Add the bonus, converting from float percent (e.g. 5 for 5%) to decimal percent
+                    permanentClickBonusPercent += (decimal)prestigeData.effectValuePerLevel * 100M * state.level;
+                 }
             }
-            // else { Debug.LogWarning($"[ClickUpgradeManager] State DataRef {state.upgradeDataRef.name} is not PrestigeUpgradeData"); }
+             else {
+                 Debug.LogWarning($"[ClickUpgradeManager] Encountered an UpgradeState whose data ({state.upgradeDataRef.GetType()}) is not PrestigeUpgradeData.");
+             }
         }
-        RecalculateTotalClickBonus(); // Recalculate after iterating through all relevant prestige upgrades
-        // Debug.Log($"[ClickUpgradeManager] Permanent Click Bonus updated to: {permanentClickBonusPercent:F1}%");
+
+        Debug.Log($"[ClickUpgradeManager] Calculated Total Permanent Click Bonus Percent: {permanentClickBonusPercent}%");
+
+        // Crucial: Recalculate the final click value after updating the permanent bonus
+        CalculateAndCacheClickValue();
     }
 
     // --- Save/Load (Refactored) ---

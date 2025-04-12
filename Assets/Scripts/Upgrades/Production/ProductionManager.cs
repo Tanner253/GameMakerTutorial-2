@@ -245,6 +245,20 @@ public class ProductionManager : MonoBehaviour
         // Debug.Log("ProductionManager: Loading production upgrade levels...");
         bool stateChanged = false;
 
+        // *** ADDED: Reset all runtime levels to 0 BEFORE loading saved levels ***
+        // This ensures upgrades not present in the save data are reset correctly.
+        foreach (var state in playerProductionUpgrades)
+        {
+            if (state.level != 0)
+            {
+                state.level = 0;
+                state.productionTimer = 0f; // Also reset timer
+                OnProductionUpgradeStateChanged?.Invoke(state); // Notify UI of the reset
+                stateChanged = true; // Mark that state potentially changed
+            }
+        }
+        // **************************************************************************
+
         // Create a lookup from the available data list for efficiency
         var availableDataLookup = availableUpgradesData.Where(d => d != null).ToDictionary(d => d.name);
         // Create a lookup for the runtime states

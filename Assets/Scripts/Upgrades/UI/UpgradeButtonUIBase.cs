@@ -170,6 +170,9 @@ public abstract class UpgradeButtonUIBase : MonoBehaviour
 
     private void HandlePurchaseButtonClick()
     {
+        // Play sound first
+        AudioManager.Instance?.PlayClickSound();
+
         // Prevent accidental double-clicks if processing takes time
         SetButtonInteractable(false); 
         TryPurchaseUpgrade();

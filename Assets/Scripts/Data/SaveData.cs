@@ -17,24 +17,24 @@ public class SaveData
     // Prestige Data - NEW
     public string goldBars; // NEW: Using string for decimal precision
     public int prestigeCount; // NEW: Track number of prestiges
-    public List<PrestigeUpgradeSaveData> prestigeUpgradeLevels; // NEW: Store levels of prestige upgrades
+    public List<UpgradeSaveData> prestigeUpgradeLevels; // NEW: Store levels of prestige upgrades using the standard struct
 
     // Offline Progress Tracking
     public long lastSaveTimestampTicks; // NEW: Store DateTime.UtcNow.Ticks
 
-    // Constructor to initialize lists and new fields
+    // Constructor to initialize lists and new fields to a completely reset state
     public SaveData()
     {
         currentScore = "0";
-        totalLifetimeScoreEarned = "0"; // Initialize lifetime score
+        totalLifetimeScoreEarned = "0";
         clickUpgradeLevels = new List<UpgradeSaveData>();
         productionUpgradeLevels = new List<UpgradeSaveData>();
 
-        // Initialize Prestige Data
-        goldBars = "0";
-        prestigeCount = 0;
-        prestigeUpgradeLevels = new List<PrestigeUpgradeSaveData>();
-        lastSaveTimestampTicks = 0; // Initialize timestamp
+        // Reset Prestige Data to default starting state
+        goldBars = "0"; // Changed from "1" to "0"
+        prestigeCount = 0; // Changed from 1 to 0
+        prestigeUpgradeLevels = new List<UpgradeSaveData>();
+        lastSaveTimestampTicks = 0;
     }
 }
 
@@ -47,9 +47,9 @@ public struct UpgradeSaveData
 }
 
 // NEW: Helper struct for serializing prestige upgrade levels
-[Serializable]
-public struct PrestigeUpgradeSaveData
-{
-    public string upgradeName; // Use the ScriptableObject's name as the identifier
-    public int level;
-} 
+// [Serializable]  // <-- DELETE THIS STRUCT
+// public struct PrestigeUpgradeSaveData
+// {
+//     public string upgradeId; // Use the ScriptableObject asset name as the ID
+//     public int level;
+// } 

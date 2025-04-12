@@ -20,7 +20,10 @@ public class ResetButtonHelper : MonoBehaviour
             resetButton.onClick.RemoveAllListeners();
 
             // Add the listener purely through code, targeting the current instance
-            resetButton.onClick.AddListener(gameManager.HardResetGameData);
+            resetButton.onClick.AddListener(() => {
+                AudioManager.Instance?.PlayClickSound(); // Play sound first
+                gameManager.HardResetGameData();
+            });
             Debug.Log(
                 $"ResetButtonHelper: Added listener for GameManager.HardResetGameData on {gameObject.name}"
             );

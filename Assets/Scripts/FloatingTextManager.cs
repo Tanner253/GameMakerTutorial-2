@@ -6,6 +6,8 @@ using System.Collections.Generic; // Added for tracking active coroutines
 
 public class FloatingTextManager : MonoBehaviour
 {
+    public static FloatingTextManager Instance { get; private set; } // ADDED SINGLETON INSTANCE
+
     [Header("Floating Text Settings")]
     public GameObject floatingTextPrefab; // Assign your TextMeshPro prefab here
     public Transform textSpawnParent;     // Assign the Canvas Transform here
@@ -42,6 +44,20 @@ public class FloatingTextManager : MonoBehaviour
 
     void Awake()
     {
+        // --- ADDED Singleton Logic Start ---
+        if (Instance == null)
+        {
+            Instance = this;
+            DontDestroyOnLoad(gameObject); // Make it persistent if needed
+        }
+        else
+        {
+            Debug.LogWarning("[FloatingTextManager] Duplicate instance detected. Destroying self.");
+            Destroy(gameObject);
+            return;
+        }
+        // --- ADDED Singleton Logic End ---
+
         InitializePool();
     }
 

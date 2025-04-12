@@ -100,6 +100,7 @@ public class ButtonCounter : MonoBehaviour, IPointerClickHandler
         if (GameManager.Instance != null && rectTransform != null)
         {
             GameManager.Instance.ProcessClick(rectTransform.anchoredPosition);
+            AudioManager.Instance?.PlayClickSound(); // Play the click sound
         }
         else
         {

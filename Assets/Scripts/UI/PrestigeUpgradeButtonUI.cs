@@ -87,14 +87,23 @@ public class PrestigeUpgradeButtonUI : MonoBehaviour
 
         // Update Level Text
         if (levelText != null)
-            levelText.text = $"Level: {_currentState.level}";
+        {
+            if (_upgradeData.isUniqueUnlock && _currentState.level > 0)
+            {
+                levelText.text = "Unlocked"; // Show Unlocked for unique purchases
+            }
+            else
+            {
+                 levelText.text = $"Level: {_currentState.level}";
+            }
+        }
 
-        // Update Cost Text (handle max level if applicable)
+        // Update Cost Text
         if (costText != null)
         {
             if (_upgradeData.isUniqueUnlock && _currentState.level > 0)
             {
-                 costText.text = "Purchased";
+                 costText.text = "-"; // No cost after unique purchase
             }
             else
             {
@@ -103,7 +112,28 @@ public class PrestigeUpgradeButtonUI : MonoBehaviour
             }
         }
 
-        // Update Requirement Text (optional)
+         // Update Description / Effect Display (MODIFY THIS BASED ON YOUR UI)
+        if (descriptionText != null)
+        {
+            // Basic description from SO
+            descriptionText.text = _upgradeData.description;
+
+            // --- Add logic here to display current/next effect based on _upgradeData.effectType ---
+            // Example for Lemon Lifespan:
+            /*
+            if (_upgradeData.effectType == PrestigeEffectType.LemonLifespan)
+            {
+                 float currentBonus = _prestigeManager.GetTotalLemonLifespanBonusSeconds();
+                 float nextLevelBonus = _upgradeData.effectValuePerLevel * (_currentState.level + 1);
+                 // Assuming you have another Text field called 'effectText'
+                 // effectText.text = $"Current Bonus: +{currentBonus:F1}s\nNext Level: +{nextLevelBonus:F1}s Total";
+                 descriptionText.text += $"\nCurrent Bonus: +{currentBonus:F1}s"; // Append to description
+            }
+            // Add similar blocks for LemonSpawnRate, LemonValue, ClickMultiplier etc.
+            */
+        }
+
+        // Update Requirement Text
         if (requirementText != null)
         {
             if (_upgradeData.requiredPrestigeLevel > 0)
@@ -126,6 +156,9 @@ public class PrestigeUpgradeButtonUI : MonoBehaviour
 
     void HandlePurchaseClick()
     {
+        // Play sound first
+        AudioManager.Instance?.PlayClickSound();
+
         _prestigeManager?.PurchasePrestigeUpgrade(_upgradeData);
         // The UI should update via the HandleThisUpgradePurchased event handler
     }

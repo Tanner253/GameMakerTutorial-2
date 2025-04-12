@@ -65,6 +65,7 @@ public class NavigateToPrestigeScene : MonoBehaviour
 
     void LoadPrestigeScene()
     {
+        AudioManager.Instance?.PlayClickSound(); // Play click sound
         // Get the scene name from the PrestigeManager (safe access)
         string sceneName = PrestigeManager.Instance?.PrestigeSceneName;
         if (!string.IsNullOrEmpty(sceneName))

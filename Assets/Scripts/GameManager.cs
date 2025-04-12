@@ -212,6 +212,13 @@ public class GameManager : MonoBehaviour
         // {
         //     UpdateProductionRateDisplay(0); 
         // }
+
+        // Start Music
+        if (AudioManager.Instance != null) {
+            AudioManager.Instance.PlayMusic(0.2f); // Play music assigned in AudioManager at 20% volume
+        }
+
+        Debug.Log("GameManager Started");
     }
 
     // Method called when a click occurs
@@ -259,17 +266,21 @@ public class GameManager : MonoBehaviour
     // If a full hard reset is needed separate from prestige:
     public void HardResetGameData()
     {
-        Debug.LogWarning("Performing HARD RESET - Deleting save file and resetting runtime data.");
-        saveLoadManager?.DeleteSaveFile(); // Delete the save file
+        Debug.LogWarning("Performing HARD RESET - Deleting save file and loading default data state.");
+        saveLoadManager?.DeleteSaveFile(); // 1. Delete the save file
 
-        // Reset runtime data in all managers
-        scoreManager?.ResetData();
-        clickUpgradeManager?.ResetData();
-        productionManager?.ResetData();
-        prestigeManager?.ResetData(); // NEW call
+        // 2. Create a new SaveData object, which will use the constructor defaults
+        SaveData defaultData = new SaveData();
 
-        // Update UI explicitly if needed, as events should handle most of it
-        // Example: Ensure production rate display is updated
+        // 3. Load this default data into the managers, overwriting current runtime values
+        // This effectively resets them to the state defined in SaveData() constructor
+        scoreManager?.LoadData(defaultData);
+        clickUpgradeManager?.LoadData(defaultData);
+        productionManager?.LoadData(defaultData);
+        prestigeManager?.LoadData(defaultData); // Use LoadData to apply defaults
+
+        // Update UI explicitly if needed, as events triggered by LoadData should handle most of it
+        // Example: Ensure production rate display is updated after defaults are loaded
         if (productionManager != null)
         {
              UpdateProductionRateDisplay(productionManager.GetTotalProductionRatePerSecond());
@@ -279,12 +290,12 @@ public class GameManager : MonoBehaviour
              UpdateProductionRateDisplay(0);
         }
 
-        // *** NEW STEP: Immediately save the reset state ***
-        saveLoadManager?.SaveGameData();
+        // REMOVED: Immediate save after reset. Saving should happen naturally (e.g., OnApplicationQuit).
+        // saveLoadManager?.SaveGameData();
 
-        Debug.LogWarning("Hard Reset Complete. Save file deleted, runtime data reset, and reset state saved.");
+        Debug.LogWarning("Hard Reset Complete. Save file deleted, runtime data reset to defaults.");
 
-        // REMOVED: SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        // REMOVED: SceneManager.LoadScene(SceneManager.GetActiveScene().name); // Generally better to handle UI/state updates directly
     }
 
     // --- Production Rate Display --- 
