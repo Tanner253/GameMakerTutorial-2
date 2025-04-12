@@ -242,7 +242,7 @@ public class ProductionManager : MonoBehaviour
             return;
         }
 
-        Debug.Log("ProductionManager: Loading production upgrade levels...");
+        // Debug.Log("ProductionManager: Loading production upgrade levels...");
         bool stateChanged = false;
 
         // Create a lookup from the available data list for efficiency
@@ -274,7 +274,7 @@ public class ProductionManager : MonoBehaviour
 
         if (stateChanged)
         {
-            Debug.Log("ProductionManager: Levels loaded.");
+            // Debug.Log("ProductionManager: Levels loaded.");
             UpdateTotalRateAndNotify(); // Recalculate total rate if levels changed
         }
         else

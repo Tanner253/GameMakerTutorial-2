@@ -1,7 +1,7 @@
+using System.Globalization;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
-using System.Globalization;
 
 public class PrestigeUIController : MonoBehaviour
 {
@@ -37,7 +37,7 @@ public class PrestigeUIController : MonoBehaviour
         // Initialize might run here if the object starts active
         // but OnEnable is generally more reliable for setup when
         // dealing with scenes loading/objects activating.
-        // Initialize(); 
+        // Initialize();
     }
 
     void OnEnable()
@@ -45,12 +45,12 @@ public class PrestigeUIController : MonoBehaviour
         // This is called when the scene loads or the GameObject becomes active.
         // It's a good place to ensure initialization and UI refresh happens.
         Initialize(); // Ensures manager ref is found and events subscribed
-        
+
         // Explicitly update displays after initializing/subscribing
         // This helps catch the state even if events were missed or Start order was off.
         if (_isInitialized) // Ensure Initialize() didn't fail
         {
-             UpdateUIDisplays(); 
+            UpdateUIDisplays();
         }
     }
 
@@ -71,10 +71,10 @@ public class PrestigeUIController : MonoBehaviour
             // gameObject.SetActive(false);
             // return; // Don't return entirely, might still show score
         }
-         if (_scoreManager == null) // NEW: Check for ScoreManager
+        if (_scoreManager == null) // NEW: Check for ScoreManager
         {
-             Debug.LogError("PrestigeUIController: ScoreManager instance not found!");
-             // Decide how to handle - maybe disable score display?
+            Debug.LogError("PrestigeUIController: ScoreManager instance not found!");
+            // Decide how to handle - maybe disable score display?
         }
 
         // Setup button listeners
@@ -97,35 +97,48 @@ public class PrestigeUIController : MonoBehaviour
 
     void SubscribeToEvents()
     {
-        if (_prestigeManager != null) 
+        // Check managers AGAIN before subscribing, just in case Start failed partially
+        if (_prestigeManager != null)
         {
-            // Keep these PrestigeManager subscriptions
-            _prestigeManager.OnGoldBarsChanged += UpdateGoldBarDisplay; // NEW
+            // ADD LOG HERE
+            Debug.Log(
+                "[PrestigeUIController] Subscribing HandlePotentialGainCalculated to OnPotentialPrestigeGainCalculated."
+            );
+            _prestigeManager.OnPotentialPrestigeGainCalculated += HandlePotentialGainCalculated;
+
+            // Keep other subscriptions
+            _prestigeManager.OnGoldBarsChanged += UpdateGoldBarDisplay;
             _prestigeManager.OnPrestigeCountChanged += UpdatePrestigeLevelDisplay;
-            _prestigeManager.OnPotentialPrestigeGainCalculated += UpdatePotentialGainDisplay;
-            _prestigeManager.OnPrestigeUpgradePurchased += HandleUpgradePurchased; // Refresh shop on purchase
+            _prestigeManager.OnPrestigeUpgradePurchased += HandlePrestigeUpgradePurchased;
         }
-        
-        // Subscribe to ScoreManager for main score updates - NEW
+        else
+        {
+            Debug.LogError("Cannot subscribe to PrestigeManager events: Instance is null.");
+        }
+
         if (_scoreManager != null)
         {
-            _scoreManager.OnScoreChanged += UpdateMainScoreDisplay; 
+            _scoreManager.OnScoreChanged += UpdateMainScoreDisplay;
+        }
+        else
+        {
+            Debug.LogError("Cannot subscribe to ScoreManager events: Instance is null.");
         }
     }
 
     void UnsubscribeFromEvents()
     {
-         if (_prestigeManager != null) 
-         {
+        if (_prestigeManager != null)
+        {
             // Keep these
             _prestigeManager.OnGoldBarsChanged -= UpdateGoldBarDisplay; // NEW
             _prestigeManager.OnPrestigeCountChanged -= UpdatePrestigeLevelDisplay;
-            _prestigeManager.OnPotentialPrestigeGainCalculated -= UpdatePotentialGainDisplay;
-            _prestigeManager.OnPrestigeUpgradePurchased -= HandleUpgradePurchased;
-         }
+            _prestigeManager.OnPotentialPrestigeGainCalculated -= HandlePotentialGainCalculated;
+            _prestigeManager.OnPrestigeUpgradePurchased -= HandlePrestigeUpgradePurchased;
+        }
 
         // Unsubscribe from ScoreManager - NEW
-         if (_scoreManager != null)
+        if (_scoreManager != null)
         {
             _scoreManager.OnScoreChanged -= UpdateMainScoreDisplay;
         }
@@ -136,12 +149,12 @@ public class PrestigeUIController : MonoBehaviour
         // Update Main Score display
         if (_scoreManager != null)
         {
-             UpdateMainScoreDisplay(_scoreManager.GetCurrentScore());
+            UpdateMainScoreDisplay(_scoreManager.GetCurrentScore());
         }
         else if (mainScoreDisplayText != null)
         {
-             // Show error or default if ScoreManager is missing
-             mainScoreDisplayText.text = "Score N/A";
+            // Show error or default if ScoreManager is missing
+            mainScoreDisplayText.text = "Score N/A";
         }
 
         // Keep updating Prestige Level and Potential Gain from PrestigeManager
@@ -152,12 +165,15 @@ public class PrestigeUIController : MonoBehaviour
             UpdatePotentialGainDisplay(_prestigeManager.CalculatePotentialGoldBarGain());
             UpdatePrestigeButtonState();
         }
-        else 
-        {   
+        else
+        {
             // Handle missing PrestigeManager for other elements if needed
-             if (prestigeLevelText != null) prestigeLevelText.text = "Level N/A";
-             if (potentialGainText != null) potentialGainText.text = "Gain N/A";
-             if (confirmPrestigeButton != null) confirmPrestigeButton.interactable = false;
+            if (prestigeLevelText != null)
+                prestigeLevelText.text = "Level N/A";
+            if (potentialGainText != null)
+                potentialGainText.text = "Gain N/A";
+            if (confirmPrestigeButton != null)
+                confirmPrestigeButton.interactable = false;
         }
     }
 
@@ -172,7 +188,7 @@ public class PrestigeUIController : MonoBehaviour
     void UpdateGoldBarDisplay(decimal newBalance)
     {
         if (goldBarBalanceText != null)
-            goldBarBalanceText.text = $"Gold Bars: {NumberFormatter.FormatNumber(newBalance)}"; // Added prefix
+            goldBarBalanceText.text = $"{NumberFormatter.FormatNumber(newBalance)}"; // Added prefix
     }
 
     void UpdatePrestigeLevelDisplay(int count)
@@ -186,7 +202,8 @@ public class PrestigeUIController : MonoBehaviour
         if (potentialGainText != null)
         {
             // Always format and show the text, even if gain is 0
-            potentialGainText.text = $"Potential Gain: +{NumberFormatter.FormatNumber(potentialGain)} GB";
+            potentialGainText.text =
+                $"Potential Gain: +{NumberFormatter.FormatNumber(potentialGain)}GB";
             potentialGainText.gameObject.SetActive(true); // Ensure it's active
         }
 
@@ -195,20 +212,20 @@ public class PrestigeUIController : MonoBehaviour
 
     void UpdatePrestigeButtonState()
     {
+        // --- Keep Existing Logic ---
         // Update the interactability of the CONFIRM button INSIDE the panel
         if (confirmPrestigeButton != null && _prestigeManager != null)
         {
-             bool canAfford = _prestigeManager.CanAffordPrestige();
-             confirmPrestigeButton.interactable = canAfford;
+            bool canAffordConfirm = _prestigeManager.CanAffordPrestige(); // Renamed variable for clarity
+            confirmPrestigeButton.interactable = canAffordConfirm;
         }
 
         // Update requirements text inside the panel
-         if (requirementsText != null && _prestigeManager != null)
+        if (requirementsText != null && _prestigeManager != null)
         {
-            // Get the dynamically calculated required score
-            decimal reqScore = _prestigeManager.GetRequiredScoreForNextPrestige(); 
+            decimal reqScore = _prestigeManager.GetRequiredScoreForNextPrestige();
             string reqScoreFormatted = NumberFormatter.FormatNumber(reqScore);
-            requirementsText.text = $"Requires {reqScoreFormatted} Lifetime Score";
+            requirementsText.text = $"Prestige Cost: {reqScoreFormatted} nuggets";
         }
     }
 
@@ -217,7 +234,13 @@ public class PrestigeUIController : MonoBehaviour
         prestigeShopPanel?.SetActive(false);
         prestigeNavBar?.SetActive(false);
 
-        UpdatePotentialGainDisplay(_prestigeManager.CalculatePotentialGoldBarGain());
+        // Force update the potential gain and button states when the panel is opened
+        if (_prestigeManager != null)
+        {
+            UpdatePotentialGainDisplay(_prestigeManager.CalculatePotentialGoldBarGain());
+            UpdatePrestigeButtonState(); // Ensure button state and requirement text are also updated
+        }
+
         prestigePanel?.SetActive(true);
     }
 
@@ -239,7 +262,7 @@ public class PrestigeUIController : MonoBehaviour
         prestigePanel?.SetActive(false);
         prestigeNavBar?.SetActive(false);
 
-        PopulatePrestigeShop(); 
+        PopulatePrestigeShop();
         prestigeShopPanel?.SetActive(true);
     }
 
@@ -251,14 +274,21 @@ public class PrestigeUIController : MonoBehaviour
 
     void PopulatePrestigeShop()
     {
-        if (_prestigeManager == null) Debug.LogError("[PopulatePrestigeShop] PrestigeManager is NULL!");
-        if (upgradeListContainer == null) Debug.LogError("[PopulatePrestigeShop] UpgradeListContainer is NULL!");
-        if (prestigeUpgradeButtonPrefab == null) Debug.LogError("[PopulatePrestigeShop] PrestigeUpgradeButtonPrefab is NULL!");
+        if (_prestigeManager == null)
+            Debug.LogError("[PopulatePrestigeShop] PrestigeManager is NULL!");
+        if (upgradeListContainer == null)
+            Debug.LogError("[PopulatePrestigeShop] UpgradeListContainer is NULL!");
+        if (prestigeUpgradeButtonPrefab == null)
+            Debug.LogError("[PopulatePrestigeShop] PrestigeUpgradeButtonPrefab is NULL!");
 
-        if (_prestigeManager == null || upgradeListContainer == null || prestigeUpgradeButtonPrefab == null) 
+        if (
+            _prestigeManager == null
+            || upgradeListContainer == null
+            || prestigeUpgradeButtonPrefab == null
+        )
         {
-             Debug.LogWarning("[PopulatePrestigeShop] Exiting early due to null reference.");
-             return;
+            Debug.LogWarning("[PopulatePrestigeShop] Exiting early due to null reference.");
+            return;
         }
 
         foreach (Transform child in upgradeListContainer)
@@ -268,15 +298,19 @@ public class PrestigeUIController : MonoBehaviour
 
         if (_prestigeManager.availablePrestigeUpgradesData == null)
         {
-             Debug.LogError("[PopulatePrestigeShop] PrestigeManager.availablePrestigeUpgradesData is NULL!");
-             return;
+            Debug.LogError(
+                "[PopulatePrestigeShop] PrestigeManager.availablePrestigeUpgradesData is NULL!"
+            );
+            return;
         }
 
         foreach (var upgradeData in _prestigeManager.availablePrestigeUpgradesData)
         {
-            if (upgradeData == null) 
+            if (upgradeData == null)
             {
-                Debug.LogWarning("[PopulatePrestigeShop] Found NULL entry in upgrade data list. Skipping.");
+                Debug.LogWarning(
+                    "[PopulatePrestigeShop] Found NULL entry in upgrade data list. Skipping."
+                );
                 continue;
             }
 
@@ -288,13 +322,16 @@ public class PrestigeUIController : MonoBehaviour
             }
             else
             {
-                Debug.LogError($"[PopulatePrestigeShop] Instantiated PrestigeUpgradeButtonPrefab is MISSING PrestigeUpgradeButtonUI component! Prefab: {prestigeUpgradeButtonPrefab.name}", buttonGO);
+                Debug.LogError(
+                    $"[PopulatePrestigeShop] Instantiated PrestigeUpgradeButtonPrefab is MISSING PrestigeUpgradeButtonUI component! Prefab: {prestigeUpgradeButtonPrefab.name}",
+                    buttonGO
+                );
             }
         }
     }
 
     // Called when an upgrade is purchased to refresh the shop UI state
-    void HandleUpgradePurchased(PrestigeUpgradeData purchasedData, int newLevel)
+    void HandlePrestigeUpgradePurchased(PrestigeUpgradeData purchasedData, int newLevel)
     {
         // Simple refresh: Repopulate the whole shop
         // More complex logic could just update the specific button
@@ -303,4 +340,14 @@ public class PrestigeUIController : MonoBehaviour
             PopulatePrestigeShop();
         }
     }
-} 
+
+    // Add the handler if it's missing or add log if present
+    void HandlePotentialGainCalculated(decimal potentialGain)
+    {
+        // ADD LOG HERE
+        Debug.Log(
+            $"[PrestigeUIController] HandlePotentialGainCalculated received: {potentialGain}. Calling UpdatePotentialGainDisplay."
+        );
+        UpdatePotentialGainDisplay(potentialGain);
+    }
+}

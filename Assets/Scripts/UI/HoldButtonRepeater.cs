@@ -36,9 +36,6 @@ public class HoldButtonRepeater : MonoBehaviour, IPointerDownHandler, IPointerUp
         _isPointerDown = true;
         // Debug.Log("Pointer Down");
 
-        // Trigger the click immediately on press
-        _button.onClick.Invoke();
-
         // Stop any previous repeating coroutine
         if (_repeatCoroutine != null)
         {

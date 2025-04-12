@@ -228,7 +228,7 @@ public class ClickUpgradeManager : MonoBehaviour
     // NEW: Method called by PrestigeManager to update the permanent bonus
     public void UpdatePermanentClickBonus(List<UpgradeState> prestigeStates)
     {
-        Debug.Log($"[ClickUpgradeManager] Attempting UpdatePermanentClickBonus. Received {prestigeStates?.Count ?? -1} states.");
+        // Debug.Log($"[ClickUpgradeManager] Attempting UpdatePermanentClickBonus. Received {prestigeStates?.Count ?? -1} states.");
         if (prestigeStates == null) {
             Debug.LogError("[ClickUpgradeManager] Received null list for prestigeStates!");
             permanentClickBonusPercent = 0M;
@@ -258,9 +258,8 @@ public class ClickUpgradeManager : MonoBehaviour
             }
             // else { Debug.LogWarning($"[ClickUpgradeManager] State DataRef {state.upgradeDataRef.name} is not PrestigeUpgradeData"); }
         }
-        Debug.Log($"[ClickUpgradeManager] Permanent Click Bonus updated to: {permanentClickBonusPercent}%");
-        // Recalculate the click value after updating the bonus
-        RecalculateTotalClickBonus(); // This will call CalculateAndCacheClickValue
+        RecalculateTotalClickBonus(); // Recalculate after iterating through all relevant prestige upgrades
+        // Debug.Log($"[ClickUpgradeManager] Permanent Click Bonus updated to: {permanentClickBonusPercent:F1}%");
     }
 
     // --- Save/Load (Refactored) ---
@@ -277,7 +276,7 @@ public class ClickUpgradeManager : MonoBehaviour
         }
 
         bool needsRecalculate = false;
-        Debug.Log("ClickUpgradeManager: Loading click upgrade levels...");
+        // Debug.Log("ClickUpgradeManager: Loading click upgrade levels...");
 
         // Create a lookup from the available data list for efficiency
         var availableDataLookup = availableClickUpgradesData.Where(d => d != null).ToDictionary(d => d.name);
@@ -311,8 +310,8 @@ public class ClickUpgradeManager : MonoBehaviour
 
         if (needsRecalculate)
         {
-            Debug.Log("ClickUpgradeManager: Levels loaded, recalculating total bonus...");
-            RecalculateTotalClickBonus(); // This now correctly factors in permanent bonus via CalculateAndCacheClickValue
+            // Debug.Log("ClickUpgradeManager: Levels loaded, recalculating total bonus...");
+            RecalculateTotalClickBonus(); // Recalculate bonuses after loading levels
         }
         else
         {

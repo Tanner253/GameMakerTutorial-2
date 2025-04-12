@@ -68,66 +68,66 @@ public class SaveLoadManager : MonoBehaviour
 
         if (File.Exists(saveFilePath))
         {
-            Debug.Log($"[Load] Save file found at {saveFilePath}");
+            // Debug.Log($"[Load] Save file found at {saveFilePath}");
             try
             {
-                Debug.Log("[Load] Reading encrypted bytes...");
+                // Debug.Log("[Load] Reading encrypted bytes...");
                 byte[] encryptedData = File.ReadAllBytes(saveFilePath);
-                Debug.Log($"[Load] Read {encryptedData?.Length ?? 0} encrypted bytes. Decrypting...");
+                // Debug.Log($"[Load] Read {encryptedData?.Length ?? 0} encrypted bytes. Decrypting...");
 
                 json = EncryptionUtility.Decrypt(encryptedData);
 
                 if (!string.IsNullOrEmpty(json))
                 {
-                    Debug.Log("[Load] Decryption successful. Deserializing JSON...");
+                    // Debug.Log("[Load] Decryption successful. Deserializing JSON...");
                     // Debug.Log($"[Load] Decrypted JSON: {json}"); // Uncomment cautiously for debugging, might be large
                     loadedData = JsonUtility.FromJson<SaveData>(json);
-                     Debug.Log("[Load] JSON Deserialized successfully.");
+                     // Debug.Log("[Load] JSON Deserialized successfully.");
                 }
                 else
                 {
                      // Error already logged by EncryptionUtility if decryption itself failed
-                     Debug.LogError("[Load] Decryption returned null or empty string. Loading default game state.");
+                     // Debug.LogError("[Load] Decryption returned null or empty string. Loading default game state.");
                      loadedData = new SaveData(); // Ensure defaults on decryption failure
                 }
             }
             catch (ArgumentException argEx) // Specific exception for JsonUtility failures
             {
-                Debug.LogError($"[Load] Error deserializing JSON: {argEx.Message}. JSON content was: \n{json ?? "<Decryption Failed>"}\nLoading default game state.");
+                // Debug.LogError($"[Load] Error deserializing JSON: {argEx.Message}. JSON content was: \n{json ?? "<Decryption Failed>"}\nLoading default game state.");
                 loadedData = new SaveData(); // Ensure we load defaults on JSON error
             }
             catch (Exception ex) // Catch other potential errors (IO, etc.)
             {
-                 Debug.LogError($"[Load] General error loading/processing save file: {ex.Message}. Loading default game state.");
+                 // Debug.LogError($"[Load] General error loading/processing save file: {ex.Message}. Loading default game state.");
                  loadedData = null; // Ensure we fall through to default creation
             }
         }
         else
         {
-             Debug.Log($"[Load] No save file found at {saveFilePath}. Loading default game state.");
+             // Debug.Log($"[Load] No save file found at {saveFilePath}. Loading default game state.");
              loadedData = new SaveData(); // Create a default SaveData object for initialization
         }
 
          // If loadedData is still null after attempts (e.g., general exception), create a default one
          if (loadedData == null) { 
              loadedData = new SaveData();
-             Debug.Log("[Load] Instantiated default SaveData because loadedData was null.");
+             // Debug.Log("[Load] Instantiated default SaveData because loadedData was null.");
          }
 
         // Distribute loaded data (or default data) to managers
-        Debug.Log("[Load] Initializing ScoreManager...");
+        // Debug.Log("[Load] Initializing ScoreManager...");
         _scoreManager?.LoadData(loadedData);
-        Debug.Log("[Load] Initializing ClickUpgradeManager...");
+        // Debug.Log("[Load] Initializing ClickUpgradeManager...");
         _clickUpgradeManager?.LoadData(loadedData);
-        Debug.Log("[Load] Initializing ProductionManager...");
+        // Debug.Log("[Load] Initializing ProductionManager...");
         _productionManager?.LoadData(loadedData);
-        Debug.Log("[Load] Initializing PrestigeManager..."); // NEW
+        // Debug.Log("[Load] Initializing PrestigeManager..."); // NEW
         _prestigeManager?.LoadData(loadedData); // NEW
 
         // NEW: Store the loaded timestamp
         _loadedTimestampTicks = loadedData?.lastSaveTimestampTicks ?? 0;
 
-        Debug.Log("[Load] SaveLoadManager: LoadGameData finished. Managers initialized with loaded/default data.");
+        // Debug.Log("[Load] SaveLoadManager: LoadGameData finished. Managers initialized with loaded/default data.");
     }
 
     // NEW: Getter for the loaded timestamp
@@ -167,16 +167,16 @@ public class SaveLoadManager : MonoBehaviour
             try
             {
                 File.WriteAllBytes(saveFilePath, encryptedData);
-                 Debug.Log($"SaveLoadManager: Game data encrypted and saved successfully to {saveFilePath}");
+                 // Debug.Log($"SaveLoadManager: Game data encrypted and saved successfully to {saveFilePath}");
             }
             catch (Exception ex)
             {
-                 Debug.LogError($"SaveLoadManager: Failed to write save file: {ex.Message}");
+                 // Debug.LogError($"SaveLoadManager: Failed to write save file: {ex.Message}");
             }
         }
         else
         {
-             Debug.LogError("SaveLoadManager: Encryption failed. Game data not saved.");
+             // Debug.LogError("SaveLoadManager: Encryption failed. Game data not saved.");
         }
 
          // REMOVED: PlayerPrefs.Save();
@@ -192,16 +192,16 @@ public class SaveLoadManager : MonoBehaviour
             try
             {
                 File.Delete(saveFilePath);
-                Debug.Log($"SaveLoadManager: Encrypted save file deleted: {saveFilePath}");
+                // Debug.Log($"SaveLoadManager: Encrypted save file deleted: {saveFilePath}");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"SaveLoadManager: Failed to delete save file: {ex.Message}");
+                // Debug.LogError($"SaveLoadManager: Failed to delete save file: {ex.Message}");
             }
         }
         else
         {
-            Debug.Log("SaveLoadManager: No save file found to delete.");
+            // Debug.Log("SaveLoadManager: No save file found to delete.");
         }
     }
 } 

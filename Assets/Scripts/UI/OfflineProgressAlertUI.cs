@@ -12,13 +12,8 @@ public class OfflineProgressAlertUI : MonoBehaviour
 
     void Start()
     {
-        // Ensure the panel is hidden initially
-        if (alertPanel != null)
-        {
-            Debug.Log($"[OfflineProgressAlertUI.Start] Found alertPanel reference ({alertPanel.name}). Setting inactive.", alertPanel);
-            alertPanel.SetActive(false);
-        }
-        else
+        // Ensure the panel references are checked (errors logged if null)
+        if (alertPanel == null)
         {
             Debug.LogError("OfflineProgressAlertUI: Alert Panel reference not set in Inspector! Panel cannot be hidden on Start.", this);
         }

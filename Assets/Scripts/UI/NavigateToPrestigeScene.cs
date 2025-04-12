@@ -1,77 +1,88 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI; // Required for Button
+using UnityEngine.UI; // Needed for Button
 
 /// <summary>
-/// Simple script to attach to a UI Button (or an Image with a Button component)
-/// that navigates to the Prestige scene defined in PrestigeManager.
+/// Simple script attached to a Button to load the Prestige Scene when clicked.
+/// Now also handles conditionally enabling a pulse effect when prestige is affordable.
 /// </summary>
-[RequireComponent(typeof(Button))] // Ensure there's a Button component
+[RequireComponent(typeof(Button))]
 public class NavigateToPrestigeScene : MonoBehaviour
 {
-    private Button _navigationButton;
+    private Button _button;
+    private ContinuousPulseUI _pulseComponent; // Reference to the pulse script
+    private bool _isPulsing = false; // Track current state to avoid unnecessary GetComponent calls
 
     void Awake()
     {
-        // Get the Button component attached to this GameObject
-        _navigationButton = GetComponent<Button>();
-        if (_navigationButton == null)
+        _button = GetComponent<Button>();
+        _pulseComponent = GetComponent<ContinuousPulseUI>(); // Get the pulse component on the same GameObject
+
+        if (_button != null)
         {
-            Debug.LogError(
-                "NavigateToPrestigeScene requires a Button component on the same GameObject.",
-                this
-            );
+            _button.onClick.AddListener(LoadPrestigeScene);
+        }
+        else
+        {
+            Debug.LogError("NavigateToPrestigeScene requires a Button component.", this);
+        }
+
+        if (_pulseComponent == null)
+        {
+            Debug.LogWarning("ContinuousPulseUI component not found on this button. Conditional pulsing will not work.", this);
+        }
+        else
+        {
+            // Ensure it starts disabled (assuming it's disabled by default in Inspector too)
+            _pulseComponent.enabled = false;
+            _isPulsing = false;
         }
     }
 
-    void Start()
+    void Update()
     {
-        // Add listener if the button was found
-        if (_navigationButton != null)
+        // Check prestige status periodically
+        // Could optimize this by only checking when score changes if needed, but Update is simpler for now.
+        if (PrestigeManager.Instance != null && _pulseComponent != null)
         {
-            _navigationButton.onClick.AddListener(GoToPrestigeScene);
+            bool canAfford = PrestigeManager.Instance.CanAffordPrestige();
+
+            // Only update the component's state if it needs to change
+            if (canAfford && !_isPulsing)
+            {
+                _pulseComponent.enabled = true;
+                _isPulsing = true;
+                // Debug.Log("Starting Prestige Nav Pulse"); // Optional debug
+            }
+            else if (!canAfford && _isPulsing)
+            {
+                _pulseComponent.enabled = false;
+                _isPulsing = false;
+                // Debug.Log("Stopping Prestige Nav Pulse"); // Optional debug
+            }
+        }
+    }
+
+    void LoadPrestigeScene()
+    {
+        // Get the scene name from the PrestigeManager (safe access)
+        string sceneName = PrestigeManager.Instance?.PrestigeSceneName;
+        if (!string.IsNullOrEmpty(sceneName))
+        {
+            SceneManager.LoadScene(sceneName);
+        }
+        else
+        {
+            Debug.LogError("Cannot navigate: Prestige Scene Name is not set in PrestigeManager or PrestigeManager instance is null.");
         }
     }
 
     void OnDestroy()
     {
-        // Remove listener to prevent memory leaks if the button existed
-        if (_navigationButton != null)
+        // Cleanup listener
+        if (_button != null)
         {
-            _navigationButton.onClick.RemoveListener(GoToPrestigeScene);
+            _button.onClick.RemoveListener(LoadPrestigeScene);
         }
-    }
-
-    /// <summary>
-    /// Loads the prestige scene defined in PrestigeManager.
-    /// This method is typically called by the Button's onClick event.
-    /// </summary>
-    public void GoToPrestigeScene()
-    {
-        if (PrestigeManager.Instance == null)
-        {
-            Debug.LogError("NavigateToPrestigeScene: Cannot find PrestigeManager.Instance!");
-            // Optionally provide feedback to the player here
-            return;
-        }
-
-        string sceneName = PrestigeManager.Instance.PrestigeSceneName;
-
-        if (string.IsNullOrEmpty(sceneName))
-        {
-            Debug.LogError(
-                "NavigateToPrestigeScene: Prestige Scene Name is not set in PrestigeManager!"
-            );
-            // Optionally provide feedback to the player here
-            return;
-        }
-
-        // Optional: Add a check if the scene actually exists in Build Settings
-        // Note: SceneUtility requires using UnityEditor, so it won't work in a build.
-        // A better runtime check involves trying to load additively and checking for success,
-        // but for simplicity, ensure the scene is in Build Settings.
-
-        Debug.Log($"NavigateToPrestigeScene: Loading scene '{sceneName}'...");
-        SceneManager.LoadScene(sceneName);
     }
 }

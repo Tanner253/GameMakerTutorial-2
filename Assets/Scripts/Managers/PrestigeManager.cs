@@ -27,7 +27,6 @@ public class PrestigeManager : MonoBehaviour
 
     // --- Runtime State ---
     private decimal goldBars = 0M;
-    private decimal totalLifetimeScoreEarned = 0M;
     private int prestigeCount = 0;
     private Dictionary<PrestigeUpgradeData, UpgradeState> playerPrestigeUpgradesState;
 
@@ -83,7 +82,7 @@ public class PrestigeManager : MonoBehaviour
 
             if (_scoreManager != null)
             {
-                _scoreManager.OnScoreChanged += UpdateLifetimeScore;
+                _scoreManager.OnScoreChanged += HandleScoreChangeForPotentialGain;
             }
             else
             {
@@ -104,23 +103,15 @@ public class PrestigeManager : MonoBehaviour
     {
         if (_scoreManager != null)
         {
-            _scoreManager.OnScoreChanged -= UpdateLifetimeScore;
+            _scoreManager.OnScoreChanged -= HandleScoreChangeForPotentialGain;
         }
     }
 
-    void UpdateLifetimeScore(decimal currentScore)
+    // NEW: Method to recalculate potential gain when score changes
+    void HandleScoreChangeForPotentialGain(decimal newScore)
     {
-        // This logic assumes score only goes up or resets to 0.
-        // If score could decrease in other ways, this needs adjustment.
-        if (currentScore > totalLifetimeScoreEarned)
-        {
-            totalLifetimeScoreEarned = currentScore;
-        }
-        // Periodically calculate and notify potential gain
-        if (Time.frameCount % 60 == 0) // Check roughly once per second
-        {
-            CalculateAndNotifyPotentialGain();
-        }
+         // REMOVED Throttle: Calculate potential gain whenever score changes
+         CalculateAndNotifyPotentialGain();
     }
 
     void InitializePrestigeUpgradeStates()
@@ -160,40 +151,46 @@ public class PrestigeManager : MonoBehaviour
 
     public bool CanAffordPrestige()
     {
+        if (_scoreManager == null) {
+            Debug.LogError("[PrestigeManager] ScoreManager is null in CanAffordPrestige. Cannot check.");
+            return false;
+        }
         decimal requiredScore = GetRequiredScoreForNextPrestige();
-        return totalLifetimeScoreEarned >= requiredScore;
+        return _scoreManager.GetCurrentScore() >= requiredScore;
     }
 
     public decimal CalculatePotentialGoldBarGain()
     {
-        decimal requiredScore = GetRequiredScoreForNextPrestige();
-
-        // Check if player meets the minimum requirement to prestige at all
-        if (totalLifetimeScoreEarned < requiredScore)
-        {
-            return 0M; // Cannot gain GB if requirement isn't met
+        if (_scoreManager == null) {
+            Debug.LogError("[PrestigeManager] ScoreManager is null in CalculatePotentialGoldBarGain. Returning 0.");
+            return 0M;
         }
 
-        // Calculate score earned *beyond* the requirement
-        decimal excessScore = totalLifetimeScoreEarned - requiredScore;
+        decimal requiredScore = GetRequiredScoreForNextPrestige();
+        decimal currentScore = _scoreManager.GetCurrentScore();
 
-        // Ensure conversion factor is positive to avoid division by zero or weird results
+        if (currentScore < requiredScore)
+        {
+            return 0M; // Cannot gain GB if requirement (cost) isn't met
+        }
+
+        decimal excessScore = currentScore - requiredScore;
+
         if (scorePerGoldBar <= 0)
         {
             Debug.LogError("scorePerGoldBar must be positive! Setting gain to 0.");
             return 0M;
         }
 
-        // Calculate gain based on excess score
         decimal potentialGain = Math.Floor(excessScore / scorePerGoldBar);
 
-        // Ensure gain is not negative (shouldn't happen with the checks above, but safety first)
         return Math.Max(0M, potentialGain);
     }
 
     void CalculateAndNotifyPotentialGain()
     {
         decimal potentialGain = CalculatePotentialGoldBarGain();
+        // Debug.Log($"[PrestigeManager] CalculateAndNotifyPotentialGain: Calculated Gain = {potentialGain}. Invoking event..."); 
         OnPotentialPrestigeGainCalculated?.Invoke(potentialGain);
     }
 
@@ -207,44 +204,23 @@ public class PrestigeManager : MonoBehaviour
 
         Debug.Log("--- Performing Prestige --- ");
 
-        // 1. Calculate and Award Gold Bars
         decimal earnedGB = CalculatePotentialGoldBarGain();
         goldBars += earnedGB;
         Debug.Log($"Earned {earnedGB} Gold Bars. Total GB: {goldBars}");
         OnGoldBarsChanged?.Invoke(goldBars);
 
-        // 2. Increment Prestige Count
         prestigeCount++;
         Debug.Log($"Prestige Count: {prestigeCount}");
         OnPrestigeCountChanged?.Invoke(prestigeCount);
 
-        // 3. Reset Relevant Game State (Delegate to Managers)
-        _scoreManager?.ResetData(); // Resets current score, lifetime score remains
+        _scoreManager?.ResetData();
         _clickUpgradeManager?.ResetData();
         _productionManager?.ResetData();
-        // Reset lifetime score *after* calculating prestige
-        totalLifetimeScoreEarned = 0M;
 
-        // 4. Immediately Save Game State after Prestige
         _saveLoadManager?.SaveGameData();
 
         Debug.Log("--- Prestige Complete --- ");
 
-        // 5. Load the Prestige Scene (REMOVED - Navigation handled by UI)
-        // if (!string.IsNullOrEmpty(prestigeSceneName))
-        // {
-        //     Debug.Log($"Loading prestige scene: {prestigeSceneName}");
-        //     SceneManager.LoadScene(prestigeSceneName);
-        // }
-        // else
-        // {
-        //     Debug.LogWarning("Prestige scene name is not set in PrestigeManager. Cannot load scene.");
-        //      // Re-calculate potential gain if not changing scene
-        //      CalculateAndNotifyPotentialGain(); // Call this if staying in scene
-        // }
-
-        // Re-calculate potential gain (should be 0 now)
-        // This should happen automatically if UI is subscribed to score/prestige events
         CalculateAndNotifyPotentialGain();
     }
 
@@ -275,7 +251,6 @@ public class PrestigeManager : MonoBehaviour
             return decimal.MaxValue;
         if (currentLevel < 0)
             currentLevel = 0;
-        // Using double for intermediate Math.Pow, converting base cost
         double cost = data.baseCostGoldBars * Math.Pow(data.costScaleFactor, currentLevel);
         return (decimal)Math.Ceiling(cost);
     }
@@ -305,43 +280,28 @@ public class PrestigeManager : MonoBehaviour
         UpgradeState state = GetPrestigeUpgradeState(data);
         decimal cost = CalculatePrestigeUpgradeCost(data, state.level);
 
-        // Deduct cost
         goldBars -= cost;
         OnGoldBarsChanged?.Invoke(goldBars);
 
-        // Increment level
         state.level++;
         OnPrestigeUpgradePurchased?.Invoke(data, state.level);
         Debug.Log(
             $"Purchased {data.upgradeName} Level {state.level} for {cost} GB. Remaining GB: {goldBars}"
         );
 
-        // Apply the effect immediately (more complex effects might need separate manager)
         ApplyPrestigeUpgradeEffect(data, state.level);
 
-        // Save after purchase
         _saveLoadManager?.SaveGameData();
     }
 
-    // Placeholder for applying effects - This will need expansion!
     private void ApplyPrestigeUpgradeEffect(PrestigeUpgradeData data, int newLevel)
     {
         Debug.Log($"Applying effect for {data.upgradeName} Level {newLevel}");
-        // Example: If it's a click bonus upgrade, notify ClickUpgradeManager
         if (data.clickBonusPercentPerLevel > 0 && _clickUpgradeManager != null)
         {
-            // Get all current prestige states to calculate the total bonus
             List<UpgradeState> allPrestigeStates = playerPrestigeUpgradesState.Values.ToList();
             _clickUpgradeManager.UpdatePermanentClickBonus(allPrestigeStates);
         }
-
-        // Add logic for other effect types (production, mint, etc.)
-        // Example for Production:
-        // if (data.productionBonusPercentPerLevel > 0 && _productionManager != null)
-        // {
-        //     List<UpgradeState> allPrestigeStates = playerPrestigeUpgradesState.Values.ToList();
-        //     _productionManager.UpdatePermanentProductionBonus(allPrestigeStates); // Needs implementing in ProductionManager
-        // }
     }
 
     // --- Save/Load ---
@@ -350,105 +310,73 @@ public class PrestigeManager : MonoBehaviour
     {
         if (saveData == null)
         {
-            Debug.Log("PrestigeManager: No save data found, using defaults.");
-            goldBars = 0M;
-            prestigeCount = 0;
-            totalLifetimeScoreEarned = 0M; // Also reset lifetime score if no save data
-            // Ensure default state is level 0 (already done in InitializePrestigeUpgradeStates)
-            foreach (var state in playerPrestigeUpgradesState.Values)
-                state.level = 0;
-            OnGoldBarsChanged?.Invoke(goldBars);
-            OnPrestigeCountChanged?.Invoke(prestigeCount);
+            Debug.LogWarning("[PrestigeManager] LoadData called with null saveData.");
             return;
         }
 
-        Debug.Log("PrestigeManager: Loading prestige data...");
-        // Load Gold Bars
-        if (
-            decimal.TryParse(
-                saveData.goldBars,
-                NumberStyles.Any,
-                CultureInfo.InvariantCulture,
-                out decimal loadedGB
-            )
-        )
+        // Load Gold Bars (Parse from string)
+        if (decimal.TryParse(saveData.goldBars, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal loadedGB))
         {
             goldBars = loadedGB;
         }
         else
         {
-            Debug.LogWarning(
-                $"Could not parse Gold Bars value '{saveData.goldBars}'. Defaulting to 0."
-            );
+             Debug.LogWarning($"[PrestigeManager] Could not parse Gold Bars value '{saveData.goldBars}'. Defaulting to 0.");
             goldBars = 0M;
         }
 
-        // Load Prestige Count
+        // Load Prestige Count (already correct type)
         prestigeCount = saveData.prestigeCount;
 
-        // Load Total Lifetime Score
-        if (
-            decimal.TryParse(
-                saveData.totalLifetimeScoreEarned,
-                NumberStyles.Any,
-                CultureInfo.InvariantCulture,
-                out decimal loadedLifetimeScore
-            )
-        )
-        {
-            totalLifetimeScoreEarned = loadedLifetimeScore;
-        }
-        else
-        {
-            Debug.LogWarning(
-                $"Could not parse Total Lifetime Score '{saveData.totalLifetimeScoreEarned}'. Defaulting to 0."
-            );
-            totalLifetimeScoreEarned = 0M;
+        // Check and Initialization
+        if (playerPrestigeUpgradesState == null) {
+            // Debug.LogWarning("[PrestigeManager LoadData] playerPrestigeUpgradesState was null, re-initializing.");
+            InitializePrestigeUpgradeStates();
         }
 
-        // Load Prestige Upgrade Levels
+        // Load Prestige Upgrade Levels (from List<PrestigeUpgradeSaveData>)
         if (saveData.prestigeUpgradeLevels != null)
         {
-            // Create a lookup from the available data list for efficiency
             var availableDataLookup = availablePrestigeUpgradesData
                 .Where(d => d != null)
                 .ToDictionary(d => d.name);
 
-            foreach (var savedUpgrade in saveData.prestigeUpgradeLevels)
+            // Iterate through the saved list
+            foreach (var savedUpgradeData in saveData.prestigeUpgradeLevels)
             {
+                // Find the corresponding ScriptableObject
                 if (
                     availableDataLookup.TryGetValue(
-                        savedUpgrade.upgradeName,
+                        savedUpgradeData.upgradeName, // Use name from saved struct
                         out PrestigeUpgradeData dataSO
                     )
                 )
                 {
+                    // Find the state in the manager's dictionary
                     if (playerPrestigeUpgradesState.TryGetValue(dataSO, out UpgradeState state))
                     {
-                        state.level = savedUpgrade.level;
-                        // DO NOT apply effects here one by one anymore
-                        // ApplyPrestigeUpgradeEffect(dataSO, state.level); // REMOVED
+                        state.level = savedUpgradeData.level; // Set the level from saved struct
                     }
+                    // else: The state wasn't initialized properly, warning already given if dictionary was null.
                 }
                 else
                 {
                     Debug.LogWarning(
-                        $"PrestigeManager: ScriptableObject named '{savedUpgrade.upgradeName}' not found for saved prestige upgrade. Skipping."
+                        $"PrestigeManager: ScriptableObject named '{savedUpgradeData.upgradeName}' not found in available data for saved prestige upgrade. Skipping."
                     );
                 }
             }
-            // Apply ALL cumulative prestige effects *after* loading all levels
-            ApplyAllLoadedPrestigeEffects(); // NEW CALL
+            // Apply effects after loading all levels
+            ApplyAllLoadedPrestigeEffects();
         }
+        // else: No saved prestige upgrades.
         OnGoldBarsChanged?.Invoke(goldBars);
         OnPrestigeCountChanged?.Invoke(prestigeCount);
         Debug.Log("PrestigeManager: Prestige data loaded.");
     }
 
-    // NEW: Helper to apply cumulative effects after loading
     private void ApplyAllLoadedPrestigeEffects()
     {
-        // NEW: Add null check for the dictionary
         if (playerPrestigeUpgradesState == null)
         {
             Debug.LogError(
@@ -460,63 +388,51 @@ public class PrestigeManager : MonoBehaviour
         Debug.Log("Applying all loaded prestige effects...");
         List<UpgradeState> allPrestigeStates = playerPrestigeUpgradesState.Values.ToList();
 
-        // Apply Click Bonus
         _clickUpgradeManager?.UpdatePermanentClickBonus(allPrestigeStates);
-
-        // Apply Production Bonus (placeholder call)
-        // _productionManager?.UpdatePermanentProductionBonus(allPrestigeStates);
-
-        // Apply other bonuses...
     }
 
-    // NEW: Resets runtime prestige data to defaults
     public void ResetData()
     {
-        Debug.Log("PrestigeManager: Resetting runtime data...");
+        // Debug.Log("PrestigeManager: Resetting runtime data...");
         goldBars = 0M;
         prestigeCount = 0;
-        totalLifetimeScoreEarned = 0M; // Reset lifetime score as well for a hard reset
 
         foreach (var state in playerPrestigeUpgradesState.Values)
         {
             state.level = 0;
         }
 
-        // Notify listeners about the reset state
         OnGoldBarsChanged?.Invoke(goldBars);
         OnPrestigeCountChanged?.Invoke(prestigeCount);
 
-        // Apply effects based on the reset state (likely resulting in no bonuses)
         ApplyAllLoadedPrestigeEffects();
 
-        // Recalculate potential gain (should be 0)
         CalculateAndNotifyPotentialGain();
-        Debug.Log("PrestigeManager: Runtime data reset.");
+        // Debug.Log("PrestigeManager: Runtime data reset.");
     }
 
     public void UpdateSaveData(SaveData saveData)
     {
-        if (saveData == null)
-            return;
+        if (saveData == null) return;
 
-        saveData.goldBars = goldBars.ToString(CultureInfo.InvariantCulture);
-        saveData.prestigeCount = prestigeCount;
-        saveData.totalLifetimeScoreEarned = totalLifetimeScoreEarned.ToString(
-            CultureInfo.InvariantCulture
-        );
+        // Convert goldBars (decimal) to string for saving
+        saveData.goldBars = this.goldBars.ToString(CultureInfo.InvariantCulture);
+        saveData.prestigeCount = this.prestigeCount;
 
+        // Initialize the list in SaveData
         saveData.prestigeUpgradeLevels = new List<PrestigeUpgradeSaveData>();
+
+        // Populate the list from the manager's state dictionary
         foreach (var kvp in playerPrestigeUpgradesState)
         {
             if (kvp.Value.level > 0)
             {
-                saveData.prestigeUpgradeLevels.Add(
-                    new PrestigeUpgradeSaveData
-                    {
-                        upgradeName = kvp.Key.name,
-                        level = kvp.Value.level,
-                    }
-                );
+                // Create a PrestigeUpgradeSaveData struct and add it to the list
+                saveData.prestigeUpgradeLevels.Add(new PrestigeUpgradeSaveData
+                {
+                    upgradeName = kvp.Key.name, // Use the ScriptableObject's asset name
+                    level = kvp.Value.level
+                });
             }
         }
     }
