@@ -15,10 +15,23 @@ public class SaveLoadManager : MonoBehaviour
     private ProductionManager _productionManager; // Optional
     private PrestigeManager _prestigeManager; // NEW
 
+    [Header("Save File Configuration")]
+    [SerializeField] private string saveFileName = "gameSave.dat";
+    [SerializeField] private string backupSaveFileName = "gameSave_backup.dat";
+    [SerializeField] private bool enableBackups = true;
+    [SerializeField] private bool createSaveFileOnInit = true;
+    
     // --- Configuration ---
-    private string saveFileName = "gameSave.dat"; // Name of the encrypted save file
     private string saveFilePath;
-    private long _loadedTimestampTicks = 0; // NEW: Store timestamp after load
+    private string backupSaveFilePath;
+    private long _loadedTimestampTicks = 0; // Store timestamp after load
+    
+    // For additional security - track last known valid state
+    private SaveData _lastKnownGoodSaveData = null;
+    private bool _isSaving = false; // Lock to prevent simultaneous save operations
+    
+    // Event for notifying other systems about successful loads
+    public event Action<SaveData> OnSaveDataLoaded;
 
     void Awake()
     {
@@ -29,13 +42,16 @@ public class SaveLoadManager : MonoBehaviour
         }
         else
         {
+            Debug.LogWarning("[SaveLoadManager] Duplicate instance found. Destroying duplicate.");
             Destroy(gameObject);
             return;
         }
 
-        // Determine the save file path
+        // Determine the save file paths
         saveFilePath = Path.Combine(Application.persistentDataPath, saveFileName);
-        // Debug.Log($"Save file path: {saveFilePath}");
+        backupSaveFilePath = Path.Combine(Application.persistentDataPath, backupSaveFileName);
+        
+        Debug.Log($"[SaveLoadManager] Save files will be at:\n - Primary: {saveFilePath}\n - Backup: {backupSaveFilePath}");
     }
 
     /// <summary>
@@ -54,80 +70,156 @@ public class SaveLoadManager : MonoBehaviour
 
         // Load sequence
         LoadGameData();
+        
+        // Create initial save if option enabled and no save exists
+        if (createSaveFileOnInit && !File.Exists(saveFilePath) && _lastKnownGoodSaveData != null)
+        {
+            SaveGameData();
+        }
     }
 
     /// <summary>
-    /// Loads game data from the encrypted save file.
-    /// If the file doesn't exist or is invalid, loads default state.
+    /// Loads game data from the encrypted save file with backup support.
+    /// If the primary save is corrupted, tries the backup.
     /// </summary>
-    void LoadGameData()
+    public void LoadGameData()
     {
         Debug.Log("[Load] SaveLoadManager: Attempting to load game data...");
         SaveData loadedData = null;
-        string json = null; // Store json result for logging
-
-        if (File.Exists(saveFilePath))
+        
+        // Try to load from primary save file
+        loadedData = TryLoadFromFile(saveFilePath);
+        
+        // If primary load failed and backups are enabled, try the backup
+        if (loadedData == null && enableBackups && File.Exists(backupSaveFilePath))
         {
-            // Debug.Log($"[Load] Save file found at {saveFilePath}");
-            try
+            Debug.LogWarning("[Load] Primary save file load failed. Attempting to load from backup...");
+            loadedData = TryLoadFromFile(backupSaveFilePath);
+            
+            // If backup was successful but primary failed, restore the backup to primary
+            if (loadedData != null)
             {
-                // Debug.Log("[Load] Reading encrypted bytes...");
-                byte[] encryptedData = File.ReadAllBytes(saveFilePath);
-                // Debug.Log($"[Load] Read {encryptedData?.Length ?? 0} encrypted bytes. Decrypting...");
-
-                json = EncryptionUtility.Decrypt(encryptedData);
-
-                if (!string.IsNullOrEmpty(json))
+                Debug.Log("[Load] Backup load successful. Restoring backup to primary save file.");
+                try
                 {
-                    // Debug.Log("[Load] Decryption successful. Deserializing JSON...");
-                    // Debug.Log($"[Load] Decrypted JSON: {json}"); // Uncomment cautiously for debugging, might be large
-                    loadedData = JsonUtility.FromJson<SaveData>(json);
-                     // Debug.Log("[Load] JSON Deserialized successfully.");
+                    File.Copy(backupSaveFilePath, saveFilePath, true);
                 }
-                else
+                catch (Exception ex)
                 {
-                     // Error already logged by EncryptionUtility if decryption itself failed
-                     // Debug.LogError("[Load] Decryption returned null or empty string. Loading default game state.");
-                     loadedData = new SaveData(); // Ensure defaults on decryption failure
+                    Debug.LogError($"[Load] Error restoring backup to primary: {ex.Message}");
                 }
             }
-            catch (ArgumentException argEx) // Specific exception for JsonUtility failures
-            {
-                Debug.LogError($"[Load] Error deserializing JSON: {argEx.ToString()}. JSON content was: \n{json ?? "<Decryption Failed>"}\nLoading default game state.", this);
-                loadedData = new SaveData(); // Ensure we load defaults on JSON error
-            }
-            catch (Exception ex) // Catch other potential errors (IO, etc.)
-            {
-                 Debug.LogError($"[Load] General error loading/processing save file: {ex.ToString()}. Loading default game state.", this);
-                 loadedData = null; // Ensure we fall through to default creation
-            }
         }
-        else
+        
+        // Create new SaveData if all loading attempts failed
+        if (loadedData == null)
         {
-             // Debug.Log($"[Load] No save file found at {saveFilePath}. Loading default game state.");
-             loadedData = new SaveData(); // Create a default SaveData object for initialization
+            Debug.LogWarning("[Load] Could not load data from any save file. Creating new save data.");
+            loadedData = new SaveData();
         }
+        
+        // Store a reference to this valid save data for recovery
+        _lastKnownGoodSaveData = DeepCopySaveData(loadedData);
+        
+        // Distribute loaded data to managers
+        DistributeLoadedData(loadedData);
+        
+        // Notify systems that save data was loaded
+        OnSaveDataLoaded?.Invoke(loadedData);
+        
+        Debug.Log("[Load] SaveLoadManager: LoadGameData finished.");
+    }
+    
+    /// <summary>
+    /// Attempts to load save data from a specific file path
+    /// </summary>
+    private SaveData TryLoadFromFile(string filePath)
+    {
+        SaveData data = null;
+        string json = null;
+        
+        if (!File.Exists(filePath))
+        {
+            Debug.Log($"[Load] No save file found at {filePath}.");
+            return null;
+        }
+        
+        try
+        {
+            byte[] encryptedData = File.ReadAllBytes(filePath);
+            json = EncryptionUtility.Decrypt(encryptedData);
 
-         // If loadedData is still null after attempts (e.g., general exception), create a default one
-         if (loadedData == null) { 
-             loadedData = new SaveData();
-             // Debug.Log("[Load] Instantiated default SaveData because loadedData was null.");
-         }
-
-        // Distribute loaded data (or default data) to managers
-        // Debug.Log("[Load] Initializing ScoreManager...");
+            if (!string.IsNullOrEmpty(json))
+            {
+                data = JsonUtility.FromJson<SaveData>(json);
+                
+                // Basic data validation
+                if (!IsValidSaveData(data))
+                {
+                    Debug.LogError("[Load] Save data validation failed. Data may be corrupted.");
+                    return null;
+                }
+                
+                // Store loaded timestamp
+                _loadedTimestampTicks = data.lastSaveTimestampTicks;
+                
+                Debug.Log($"[Load] Successfully loaded save data from {filePath}");
+            }
+            else
+            {
+                Debug.LogError("[Load] Decryption returned null or empty string.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[Load] Error loading save from {filePath}: {ex.GetType().Name}: {ex.Message}");
+            data = null;
+        }
+        
+        return data;
+    }
+    
+    /// <summary>
+    /// Validates that the loaded save data contains expected fields
+    /// </summary>
+    private bool IsValidSaveData(SaveData data)
+    {
+        if (data == null) return false;
+        
+        // Check for basic required fields
+        if (data.clickUpgradeLevels == null || 
+            data.productionUpgradeLevels == null || 
+            data.prestigeUpgradeLevels == null)
+        {
+            return false;
+        }
+        
+        // Could add more specific validation if needed
+        
+        return true;
+    }
+    
+    /// <summary>
+    /// Makes a deep copy of SaveData for backup purposes
+    /// </summary>
+    private SaveData DeepCopySaveData(SaveData original)
+    {
+        if (original == null) return null;
+        
+        // Use JSON serialization to perform deep copy
+        string json = JsonUtility.ToJson(original);
+        return JsonUtility.FromJson<SaveData>(json);
+    }
+    
+    /// <summary>
+    /// Distributes the loaded data to all managers
+    /// </summary>
+    private void DistributeLoadedData(SaveData loadedData)
+    {
         _scoreManager?.LoadData(loadedData);
-        // Debug.Log("[Load] Initializing ClickUpgradeManager...");
         _clickUpgradeManager?.LoadData(loadedData);
-        // Debug.Log("[Load] Initializing ProductionManager...");
         _productionManager?.LoadData(loadedData);
-        // Debug.Log("[Load] Initializing PrestigeManager..."); // NEW
-        _prestigeManager?.LoadData(loadedData); // NEW
-
-        // NEW: Store the loaded timestamp
-        _loadedTimestampTicks = loadedData?.lastSaveTimestampTicks ?? 0;
-
-        // Debug.Log("[Load] SaveLoadManager: LoadGameData finished. Managers initialized with loaded/default data.");
+        _prestigeManager?.LoadData(loadedData);
     }
 
     // NEW: Getter for the loaded timestamp
@@ -138,70 +230,143 @@ public class SaveLoadManager : MonoBehaviour
 
     /// <summary>
     /// Gathers data from managers, serializes, encrypts, and saves it to a file.
+    /// Also creates a backup if enabled.
     /// </summary>
     public void SaveGameData()
     {
+        // Prevent multiple simultaneous save operations
+        if (_isSaving)
+        {
+            Debug.LogWarning("[SaveLoadManager] Save operation already in progress. Skipping.");
+            return;
+        }
+        
+        _isSaving = true;
         Debug.Log("SaveLoadManager: Saving game data...");
-
-        // 1. Gather data from managers
-        SaveData dataToSave = new SaveData();
-
-        // Call UpdateSaveData on managers that need to populate the SaveData object
-        _scoreManager?.UpdateSaveData(dataToSave);             // Needs UpdateSaveData method
-        _clickUpgradeManager?.UpdateSaveData(dataToSave);      // Needs UpdateSaveData method
-        _productionManager?.UpdateSaveData(dataToSave);        // Needs UpdateSaveData method
-        _prestigeManager?.UpdateSaveData(dataToSave); // Call new method
-
-        // NEW: Record the current time before saving
-        dataToSave.lastSaveTimestampTicks = DateTime.UtcNow.Ticks;
-
-        // 2. Serialize to JSON
-        string json = JsonUtility.ToJson(dataToSave, true); // Use pretty print for debug, false for release
-
-        // 3. Encrypt JSON
-        byte[] encryptedData = EncryptionUtility.Encrypt(json);
-
-        // 4. Write encrypted data to file
-        if (encryptedData != null)
+        
+        try
         {
-            try
+            // 1. Gather data from managers
+            SaveData dataToSave = new SaveData();
+            
+            // Call UpdateSaveData on managers that need to populate the SaveData object
+            _scoreManager?.UpdateSaveData(dataToSave);
+            _clickUpgradeManager?.UpdateSaveData(dataToSave);
+            _productionManager?.UpdateSaveData(dataToSave);
+            _prestigeManager?.UpdateSaveData(dataToSave);
+            
+            // Record the current time before saving
+            dataToSave.lastSaveTimestampTicks = DateTime.UtcNow.Ticks;
+            
+            // 2. Serialize to JSON
+            string json = JsonUtility.ToJson(dataToSave, true); // use pretty print for debug
+            
+            // 3. Encrypt and save
+            if (WriteEncryptedSaveFile(json, saveFilePath))
             {
-                File.WriteAllBytes(saveFilePath, encryptedData);
-                 // Debug.Log($"SaveLoadManager: Game data encrypted and saved successfully to {saveFilePath}");
+                // Update our last known good save data
+                _lastKnownGoodSaveData = DeepCopySaveData(dataToSave);
+                
+                // Create backup if enabled
+                if (enableBackups)
+                {
+                    WriteEncryptedSaveFile(json, backupSaveFilePath);
+                }
             }
-            catch (Exception ex)
+            else
             {
-                 Debug.LogError($"SaveLoadManager: Failed to write save file: {ex.ToString()}", this);
+                // If primary save failed, try to recover using last known good data
+                if (_lastKnownGoodSaveData != null)
+                {
+                    Debug.LogWarning("[SaveLoadManager] Primary save failed. Attempting emergency save with last known good data.");
+                    string recoveryJson = JsonUtility.ToJson(_lastKnownGoodSaveData, true);
+                    WriteEncryptedSaveFile(recoveryJson, saveFilePath);
+                }
             }
         }
-        else
+        catch (Exception ex)
         {
-             // Debug.LogError("SaveLoadManager: Encryption failed. Game data not saved.");
+            Debug.LogError($"[SaveLoadManager] Exception during save: {ex.GetType().Name}: {ex.Message}");
         }
-
-         // REMOVED: PlayerPrefs.Save();
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+    
+    /// <summary>
+    /// Encrypts and writes save data to a file
+    /// </summary>
+    private bool WriteEncryptedSaveFile(string json, string filePath)
+    {
+        try
+        {
+            byte[] encryptedData = EncryptionUtility.Encrypt(json);
+            
+            if (encryptedData != null)
+            {
+                // Write to a temporary file first to avoid corruption during write
+                string tempPath = filePath + ".tmp";
+                File.WriteAllBytes(tempPath, encryptedData);
+                
+                // If temp file was written successfully, move it to the real location
+                if (File.Exists(filePath))
+                    File.Delete(filePath);
+                    
+                File.Move(tempPath, filePath);
+                
+                Debug.Log($"[SaveLoadManager] Successfully saved to {filePath}");
+                return true;
+            }
+            else
+            {
+                Debug.LogError("[SaveLoadManager] Encryption failed. Game data not saved.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[SaveLoadManager] Error saving to {filePath}: {ex.GetType().Name}: {ex.Message}");
+        }
+        
+        return false;
     }
 
     /// <summary>
-    /// Deletes the save file. Called by GameManager during Hard Reset.
+    /// Deletes the save files. Called by GameManager during Hard Reset.
     /// </summary>
     public void DeleteSaveFile()
     {
-        if (File.Exists(saveFilePath))
+        Debug.LogWarning("[SaveLoadManager] Deleting all save files.");
+        
+        DeleteFileIfExists(saveFilePath);
+        DeleteFileIfExists(backupSaveFilePath);
+        
+        // Clear last known good data
+        _lastKnownGoodSaveData = null;
+    }
+    
+    private void DeleteFileIfExists(string filePath)
+    {
+        if (File.Exists(filePath))
         {
             try
             {
-                File.Delete(saveFilePath);
-                // Debug.Log($"SaveLoadManager: Encrypted save file deleted: {saveFilePath}");
+                File.Delete(filePath);
+                Debug.Log($"[SaveLoadManager] Deleted file: {filePath}");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"SaveLoadManager: Failed to delete save file: {ex.ToString()}", this);
+                Debug.LogError($"[SaveLoadManager] Failed to delete {filePath}: {ex.Message}");
             }
         }
-        else
-        {
-            // Debug.Log("SaveLoadManager: No save file found to delete.");
-        }
+    }
+    
+    /// <summary>
+    /// Performs a forced reload of save data from disk
+    /// </summary>
+    public void ForceReloadFromDisk()
+    {
+        Debug.Log("[SaveLoadManager] Forcing reload from disk.");
+        LoadGameData();
     }
 } 

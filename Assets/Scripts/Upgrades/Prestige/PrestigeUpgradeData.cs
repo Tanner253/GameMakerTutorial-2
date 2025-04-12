@@ -32,6 +32,10 @@ public class PrestigeUpgradeData : ScriptableObject
     public PrestigeEffectType effectType = PrestigeEffectType.None;
     [Tooltip("The amount the effect changes per level (e.g., -5 for spawn time, 0.5 for reward minutes, 1 for lifespan, 0.05 for 5% click bonus).")]
     public float effectValuePerLevel = 0.0f;
+    [Tooltip("Optional base value override for this effect (e.g., for LemonLifespan, this would override the base lifespan)")]
+    public float baseValueOverride = 0.0f;
+    [Tooltip("Optional maximum value limit for this effect (e.g., maximum seconds for LemonLifespan)")]
+    public float maxValueLimit = 0.0f;
 
     // REMOVED: Click Bonus - Replaced by generic effect system
     // [Header("Effect - Example: Click Bonus")]

@@ -10,9 +10,9 @@ public class LemonManager : MonoBehaviour
 
     [Header("Configuration - Base Values")]
     [SerializeField] private GameObject lemonPrefab; // Assign your Lemon Prefab
-    [SerializeField] private float baseMinSpawnTime = 300f; // Base 5 minutes
-    [SerializeField] private float baseMaxSpawnTime = 900f; // Base 15 minutes
-    [SerializeField] private float baseLifespan = 15f;     // Base seconds lemon stays
+    [SerializeField] private float baseMinSpawnTime = 60f; // Base 60 seconds (1 minute)
+    [SerializeField] private float baseMaxSpawnTime = 180f; // Base 180 seconds (3 minutes)
+    [SerializeField] private float baseLifespan = 15f;     // Base seconds lemon stays (fallback if not specified in upgrade data)
     [SerializeField] private float baseRewardMinutes = 5f; // Base reward = N minutes of CPS (Adjusted default)
     // Removed SerializeField for Spawn Area - we'll find it dynamically
     private RectTransform spawnArea;    // Will be found dynamically
@@ -231,7 +231,20 @@ public class LemonManager : MonoBehaviour
         // Ensure min is never greater than max
         if (_currentMinSpawnTime > _currentMaxSpawnTime) _currentMinSpawnTime = _currentMaxSpawnTime - 1f;
 
-        _currentLifespan = baseLifespan + _prestigeManager.GetTotalLemonLifespanBonusSeconds();
+        // Get base lifespan from prestige data if available, otherwise use the default value
+        var (baseLifespanValue, maxLifespanValue) = _prestigeManager.GetLemonLifespanRange();
+        float actualBaseLifespan = baseLifespanValue > 0 ? baseLifespanValue : baseLifespan;
+        
+        // Apply bonuses to the base lifespan
+        _currentLifespan = actualBaseLifespan + _prestigeManager.GetTotalLemonLifespanBonusSeconds();
+
+        // Make sure we don't exceed the maximum lifespan if one is defined
+        if (maxLifespanValue < float.MaxValue)
+        {
+            _currentLifespan = Mathf.Min(_currentLifespan, maxLifespanValue);
+            Debug.Log($"[LemonManager] Limiting lifespan to max value: {maxLifespanValue:F1}s");
+        }
+
         _currentRewardMinutes = baseRewardMinutes + _prestigeManager.GetTotalLemonValueBonusMinutes();
 
         // Update debug fields
@@ -241,12 +254,7 @@ public class LemonManager : MonoBehaviour
         DEBUG_currentLifespan = _currentLifespan;
         DEBUG_currentRewardMinutes = _currentRewardMinutes;
 
-        Debug.Log($"[LemonManager] Stats Updated: Unlock={lemonsUnlocked}, SpawnTime=[{_currentMinSpawnTime:F1}-{_currentMaxSpawnTime:F1}], Lifespan={_currentLifespan:F1}, RewardMins={_currentRewardMinutes:F1}");
-
-         // REMOVED: Starting timer here - moved to HandlePrestigeDataLoaded or when upgrade is purchased
-         // if (!isSpawnTimerRunning && lemonsUnlocked) {
-         //     StartSpawnTimer();
-         // }
+        Debug.Log($"[LemonManager] Stats Updated: Unlock={lemonsUnlocked}, SpawnTime=[{_currentMinSpawnTime:F1}-{_currentMaxSpawnTime:F1}], Lifespan={_currentLifespan:F1} (Base={actualBaseLifespan:F1}), RewardMins={_currentRewardMinutes:F1}");
     }
 
     void Update()
@@ -381,5 +389,22 @@ public class LemonManager : MonoBehaviour
         
         // Also unsubscribe from scene loaded event if we haven't already
         SceneManager.sceneLoaded -= HandleSceneLoaded;
+    }
+
+    // Public accessor methods for UI display
+    public float GetCurrentMinSpawnTime()
+    {
+        return _currentMinSpawnTime;
+    }
+
+    public float GetCurrentMaxSpawnTime()
+    {
+        return _currentMaxSpawnTime;
+    }
+
+    // Get the base reduction value (useful for UI)
+    public float GetBaseSpawnTimeReduction()
+    {
+        return baseMinSpawnTime - _currentMinSpawnTime;
     }
 }

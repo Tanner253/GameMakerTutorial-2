@@ -12,6 +12,8 @@ public class PrestigeUpgradeButtonUI : MonoBehaviour
     public TextMeshProUGUI levelText;
     public Button purchaseButton;
     public TextMeshProUGUI requirementText; // Optional: To show min prestige level
+    public TextMeshProUGUI currentStatsText; // NEW: For displaying current stats
+    public TextMeshProUGUI nextLevelStatsText; // NEW: For displaying next level stats
 
     private PrestigeUpgradeData _upgradeData;
     private PrestigeManager _prestigeManager;
@@ -112,25 +114,96 @@ public class PrestigeUpgradeButtonUI : MonoBehaviour
             }
         }
 
-         // Update Description / Effect Display (MODIFY THIS BASED ON YOUR UI)
+        // Update Description - Now just the basic description without stats
         if (descriptionText != null)
         {
-            // Basic description from SO
+            // Only use the basic description from the ScriptableObject
             descriptionText.text = _upgradeData.description;
+        }
 
-            // --- Add logic here to display current/next effect based on _upgradeData.effectType ---
-            // Example for Lemon Lifespan:
-            /*
-            if (_upgradeData.effectType == PrestigeEffectType.LemonLifespan)
+        // Update Current Stats Text
+        if (currentStatsText != null)
+        {
+            string currentStats = "";
+            switch (_upgradeData.effectType)
             {
-                 float currentBonus = _prestigeManager.GetTotalLemonLifespanBonusSeconds();
-                 float nextLevelBonus = _upgradeData.effectValuePerLevel * (_currentState.level + 1);
-                 // Assuming you have another Text field called 'effectText'
-                 // effectText.text = $"Current Bonus: +{currentBonus:F1}s\nNext Level: +{nextLevelBonus:F1}s Total";
-                 descriptionText.text += $"\nCurrent Bonus: +{currentBonus:F1}s"; // Append to description
+                case PrestigeEffectType.LemonLifespan:
+                    float currentLifespanBonus = _prestigeManager.GetTotalLemonLifespanBonusSeconds();
+                    float baseLifespan = _upgradeData.baseValueOverride > 0 ? _upgradeData.baseValueOverride : 15f;
+                    float currentTotalLifespan = baseLifespan + currentLifespanBonus;
+                    currentStats = $"Current: {currentTotalLifespan:F0} seconds";
+                    break;
+                    
+                case PrestigeEffectType.LemonSpawnRate:
+                    float spawnRateBonus = _prestigeManager.GetTotalLemonSpawnTimeReduction();
+                    
+                    // Get the estimated spawn times directly from PrestigeManager
+                    var (minSpawnTime, maxSpawnTime) = _prestigeManager.GetEstimatedLemonSpawnTimes();
+                    
+                    // Show the current spawn time range and reduction on a single line
+                    currentStats = $"Spawn time: {minSpawnTime:F0}-{maxSpawnTime:F0} seconds (Reduced by {-spawnRateBonus:F0}s)";
+                    break;
+                    
+                case PrestigeEffectType.LemonValue:
+                    float valueBonus = _prestigeManager.GetTotalLemonValueBonusMinutes();
+                    float baseValue = _upgradeData.baseValueOverride > 0 ? _upgradeData.baseValueOverride : 5f;
+                    float currentTotalValue = baseValue + valueBonus;
+                    currentStats = $"Current: {currentTotalValue:F0} minutes of CPS";
+                    break;
+                    
+                case PrestigeEffectType.ClickMultiplier:
+                    float multiplierBonus = _prestigeManager.GetTotalClickMultiplierBonus();
+                    currentStats = $"Current bonus: +{multiplierBonus * 100:F0}%";
+                    break;
+                    
+                case PrestigeEffectType.UnlockFeature:
+                default:
+                    currentStatsText.gameObject.SetActive(false);
+                    break;
             }
-            // Add similar blocks for LemonSpawnRate, LemonValue, ClickMultiplier etc.
-            */
+            
+            currentStatsText.text = currentStats;
+            currentStatsText.gameObject.SetActive(!string.IsNullOrEmpty(currentStats));
+        }
+        
+        // Update Next Level Stats Text
+        if (nextLevelStatsText != null)
+        {
+            string nextLevelStats = "";
+            // Only show next level stats if not a unique upgrade that's already purchased
+            if (!(_upgradeData.isUniqueUnlock && _currentState.level > 0))
+            {
+                switch (_upgradeData.effectType)
+                {
+                    case PrestigeEffectType.LemonLifespan:
+                        float nextLifespanBonus = _upgradeData.effectValuePerLevel;
+                        nextLevelStats = $"Next level: +{nextLifespanBonus:F0} seconds";
+                        break;
+                        
+                    case PrestigeEffectType.LemonSpawnRate:
+                        float nextSpawnRateBonus = _upgradeData.effectValuePerLevel;
+                        nextLevelStats = $"Next level: {nextSpawnRateBonus:F0} seconds faster";
+                        break;
+                        
+                    case PrestigeEffectType.LemonValue:
+                        float nextValueBonus = _upgradeData.effectValuePerLevel;
+                        nextLevelStats = $"Next level: +{nextValueBonus:F0} minute";
+                        break;
+                        
+                    case PrestigeEffectType.ClickMultiplier:
+                        float nextMultiplierBonus = _upgradeData.effectValuePerLevel;
+                        nextLevelStats = $"Next level: +{nextMultiplierBonus * 100:F0}%";
+                        break;
+                        
+                    case PrestigeEffectType.UnlockFeature:
+                    default:
+                        nextLevelStatsText.gameObject.SetActive(false);
+                        break;
+                }
+            }
+            
+            nextLevelStatsText.text = nextLevelStats;
+            nextLevelStatsText.gameObject.SetActive(!string.IsNullOrEmpty(nextLevelStats));
         }
 
         // Update Requirement Text

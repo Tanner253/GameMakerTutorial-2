@@ -13,10 +13,12 @@ MonoBehaviour:
   m_Name: Lemon
   m_EditorClassIdentifier: 
   upgradeName: Lemon
-  description: Catch lemons to gain 10 minutes worth of clicking, instantly!
+  description: Catch lemons to gain 10 minutes worth of production, instantly!
   baseCostGoldBars: 1000
   costScaleFactor: 2
   effectType: 1
   effectValuePerLevel: 0
+  baseValueOverride: 0
+  maxValueLimit: 0
   isUniqueUnlock: 1
   requiredPrestigeLevel: 1

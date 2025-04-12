@@ -361,6 +361,26 @@ public class PrestigeManager : MonoBehaviour
         return GetTotalBonusForEffect(PrestigeEffectType.ClickMultiplier);
     }
 
+    // Replace the existing GetBaseLemonLifespan method with this version that also returns max value
+    public (float baseLifespan, float maxLifespan) GetLemonLifespanRange()
+    {
+        // Find any prestige upgrade with LemonLifespan effect type that has a baseLifespan field
+        var lemonLifespanUpgrade = availablePrestigeUpgradesData?.FirstOrDefault(
+            data => data != null && data.effectType == PrestigeEffectType.LemonLifespan);
+        
+        float baseValue = lemonLifespanUpgrade != null ? lemonLifespanUpgrade.baseValueOverride : 0f;
+        float maxValue = lemonLifespanUpgrade != null && lemonLifespanUpgrade.maxValueLimit > 0 
+                        ? lemonLifespanUpgrade.maxValueLimit : float.MaxValue;
+                    
+        return (baseValue, maxValue);
+    }
+
+    // Keep a simpler version for backward compatibility
+    public float GetBaseLemonLifespan()
+    {
+        return GetLemonLifespanRange().baseLifespan;
+    }
+
     // --- Save/Load ---
 
     public void LoadData(SaveData saveData)
@@ -371,89 +391,239 @@ public class PrestigeManager : MonoBehaviour
             return;
         }
 
-        // Load Gold Bars (Parse from string)
-        if (decimal.TryParse(saveData.goldBars, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal loadedGB))
+        Debug.Log("[PrestigeManager] Loading prestige data...");
+
+        try
         {
-            goldBars = loadedGB;
+            // Load Gold Bars (Parse from string)
+            if (decimal.TryParse(saveData.goldBars, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal loadedGB))
+            {
+                goldBars = loadedGB;
+                Debug.Log($"[PrestigeManager] Loaded Gold Bars: {goldBars}");
+            }
+            else
+            {
+                Debug.LogWarning($"[PrestigeManager] Could not parse Gold Bars value '{saveData.goldBars}'. Defaulting to 0.");
+                goldBars = 0M;
+            }
+
+            // Load Prestige Count (already correct type)
+            prestigeCount = saveData.prestigeCount;
+            Debug.Log($"[PrestigeManager] Loaded Prestige Count: {prestigeCount}");
+
+            // Check and Initialize upgrade states
+            EnsureUpgradeStatesInitialized();
+
+            // Reset all states to 0 before loading
+            ResetAllUpgradeStateLevels();
+
+            // Load Prestige Upgrade Levels (from List<UpgradeSaveData>)
+            LoadPrestigeUpgradeLevels(saveData);
+
+            // Apply effects after loading
+            ApplyAllLoadedPrestigeEffects();
+
+            // Fire events for loaded data
+            OnGoldBarsChanged?.Invoke(goldBars);
+            OnPrestigeCountChanged?.Invoke(prestigeCount);
+            OnPrestigeDataLoaded?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[PrestigeManager] Exception during LoadData: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
+        }
+        
+        Debug.Log("[PrestigeManager] Finished loading prestige data.");
+    }
+
+    /// <summary>
+    /// Ensures upgrade states dictionary is initialized
+    /// </summary>
+    private void EnsureUpgradeStatesInitialized()
+    {
+        if (playerPrestigeUpgradesState == null || availablePrestigeUpgradesData == null) 
+        {
+            InitializePrestigeUpgradeStates();
         }
         else
         {
-             Debug.LogWarning($"[PrestigeManager] Could not parse Gold Bars value '{saveData.goldBars}'. Defaulting to 0.");
-            goldBars = 0M;
+            // Check if any new upgrades were added that need to be initialized
+            foreach (var data in availablePrestigeUpgradesData)
+            {
+                if (data != null && !playerPrestigeUpgradesState.ContainsKey(data))
+                {
+                    Debug.Log($"[PrestigeManager] Adding newly detected upgrade: {data.name}");
+                    playerPrestigeUpgradesState.Add(data, new UpgradeState(data) { level = 0 });
+                }
+            }
         }
+    }
 
-        // Load Prestige Count (already correct type)
-        prestigeCount = saveData.prestigeCount;
-
-        // Check and Initialization
-        if (playerPrestigeUpgradesState == null) {
-            // Debug.LogWarning("[PrestigeManager LoadData] playerPrestigeUpgradesState was null, re-initializing.");
-            InitializePrestigeUpgradeStates();
-        }
-
-        // *** ADDED: Reset all runtime levels to 0 BEFORE loading saved levels ***
-        // This ensures upgrades not present in the save data are reset correctly.
-        bool stateChanged = false; // Track if reset actually changed anything
+    /// <summary>
+    /// Resets all upgrade state levels to 0
+    /// </summary>
+    private void ResetAllUpgradeStateLevels()
+    {
+        if (playerPrestigeUpgradesState == null) return;
+        
         foreach (var state in playerPrestigeUpgradesState.Values)
         {
             if (state.level != 0)
             {
                 state.level = 0;
-                stateChanged = true;
-                // Potentially notify UI if needed for prestige upgrades on reset
-                // OnPrestigeUpgradePurchased?.Invoke(state.upgradeDataRef, state.level); // Example: Careful with nulls
             }
         }
-        // **************************************************************************
+    }
 
-        // Load Prestige Upgrade Levels (from List<UpgradeSaveData>)
-        if (saveData.prestigeUpgradeLevels != null)
+    /// <summary>
+    /// Loads prestige upgrade levels from save data
+    /// </summary>
+    private void LoadPrestigeUpgradeLevels(SaveData saveData)
+    {
+        if (saveData.prestigeUpgradeLevels == null || saveData.prestigeUpgradeLevels.Count == 0)
         {
-            Debug.Log($"[PrestigeManager.LoadData] Found {saveData.prestigeUpgradeLevels.Count} saved prestige upgrades. Processing...");
-            foreach (var savedUpgrade in saveData.prestigeUpgradeLevels)
-            {
-                Debug.Log($"[PrestigeManager.LoadData] ... Loading Saved Name: {savedUpgrade.upgradeName}, Level: {savedUpgrade.level}");
-                // Find the corresponding ScriptableObject using the saved name (consistent with other managers)
-                PrestigeUpgradeData upgradeDataSO = FindPrestigeUpgradeDataByName(savedUpgrade.upgradeName);
+            Debug.Log("[PrestigeManager] No prestige upgrade levels found in save data.");
+            return;
+        }
+        
+        Debug.Log($"[PrestigeManager] Loading {saveData.prestigeUpgradeLevels.Count} prestige upgrades...");
+        
+        int loadedCount = 0;
+        Dictionary<string, int> missingUpgrades = new Dictionary<string, int>();
 
-                if (upgradeDataSO != null)
+        foreach (var savedUpgrade in saveData.prestigeUpgradeLevels)
+        {
+            if (string.IsNullOrEmpty(savedUpgrade.upgradeName))
+            {
+                Debug.LogWarning("[PrestigeManager] Skipping upgrade with null or empty name in save data.");
+                continue;
+            }
+            
+            // Try primary lookup by exact name
+            PrestigeUpgradeData upgradeData = FindPrestigeUpgradeDataByName(savedUpgrade.upgradeName);
+            
+            // If not found by exact name, try more flexible matching
+            if (upgradeData == null)
+            {
+                upgradeData = FindPrestigeUpgradeDataByFuzzyName(savedUpgrade.upgradeName);
+            }
+
+            if (upgradeData != null)
+            {
+                // Found the upgrade, apply the saved level
+                if (playerPrestigeUpgradesState.TryGetValue(upgradeData, out UpgradeState state))
                 {
-                    // Find the state object in our runtime dictionary
-                    if (playerPrestigeUpgradesState.TryGetValue(upgradeDataSO, out UpgradeState state))
-                    {
-                        state.level = savedUpgrade.level;
-                         // Debug.Log($"[PrestigeManager LoadData] Loaded {upgradeDataSO.name} Level {state.level}");
-                    }
-                    else
-                    {
-                        Debug.LogWarning(
-                            $"[PrestigeManager LoadData] Could not find runtime state for loaded upgrade name '{savedUpgrade.upgradeName}'. Was it added to availablePrestigeUpgradesData?"
-                        );
-                    }
+                    state.level = savedUpgrade.level;
+                    loadedCount++;
+                    Debug.Log($"[PrestigeManager] Loaded upgrade: {upgradeData.name} at level {state.level}");
                 }
                 else
                 {
-                    Debug.LogWarning(
-                        $"[PrestigeManager LoadData] Could not find PrestigeUpgradeData asset with name '{savedUpgrade.upgradeName}' matching saved data. Skipping."
-                    );
+                    Debug.LogWarning($"[PrestigeManager] Found upgrade data but no state for '{savedUpgrade.upgradeName}'");
+                    missingUpgrades[savedUpgrade.upgradeName] = savedUpgrade.level;
                 }
             }
-            Debug.Log($"[PrestigeManager] Processed {saveData.prestigeUpgradeLevels.Count} loaded prestige upgrade levels.");
+            else
+            {
+                Debug.LogWarning($"[PrestigeManager] Could not find upgrade matching '{savedUpgrade.upgradeName}'");
+                missingUpgrades[savedUpgrade.upgradeName] = savedUpgrade.level;
+            }
         }
-         else {
-             Debug.Log("[PrestigeManager LoadData] No prestige upgrade levels found in save data.");
-         }
-
-        // Consider renaming or replacing with a more general OnLoadComplete event if needed.
-        ApplyAllLoadedPrestigeEffects(); // Keep this for now, might need adjustment
-
-        // If reset happened AND no saved data was loaded, we still need to apply effects (of level 0)
-        if (stateChanged && (saveData.prestigeUpgradeLevels == null || saveData.prestigeUpgradeLevels.Count == 0))
+        
+        Debug.Log($"[PrestigeManager] Successfully loaded {loadedCount} of {saveData.prestigeUpgradeLevels.Count} prestige upgrades.");
+        
+        // Report any missing upgrades
+        if (missingUpgrades.Count > 0)
         {
-            ApplyAllLoadedPrestigeEffects(); // Apply effects after resetting to 0
+            Debug.LogWarning($"[PrestigeManager] Missing {missingUpgrades.Count} prestige upgrades during load!");
+        }
+    }
+
+    /// <summary>
+    /// Tries to find an upgrade by exact name match
+    /// </summary>
+    public PrestigeUpgradeData FindPrestigeUpgradeDataByName(string name)
+    {
+        if (string.IsNullOrEmpty(name) || availablePrestigeUpgradesData == null)
+        {
+            return null;
+        }
+        
+        // First try exact match by name property (standard object name)
+        return availablePrestigeUpgradesData.FirstOrDefault(data => 
+            data != null && data.name == name);
+    }
+
+    /// <summary>
+    /// Tries to find an upgrade by more flexible name matching
+    /// </summary>
+    private PrestigeUpgradeData FindPrestigeUpgradeDataByFuzzyName(string name)
+    {
+        if (string.IsNullOrEmpty(name) || availablePrestigeUpgradesData == null)
+        {
+            return null;
+        }
+        
+        // Try matching by upgradeName (display name)
+        var match = availablePrestigeUpgradesData.FirstOrDefault(data => 
+            data != null && data.upgradeName == name);
+        
+        if (match != null) return match;
+        
+        // Try case-insensitive name match (helps if files were renamed)
+        return availablePrestigeUpgradesData.FirstOrDefault(data => 
+            data != null && string.Equals(data.name, name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public void UpdateSaveData(SaveData saveData)
+    {
+        if (saveData == null) 
+        {
+            Debug.LogError("[PrestigeManager] UpdateSaveData called with null saveData!");
+            return;
         }
 
-        OnPrestigeDataLoaded?.Invoke(); // NEW: Invoke the new event after LoadData completes
+        try
+        {
+            saveData.goldBars = goldBars.ToString(CultureInfo.InvariantCulture);
+            saveData.prestigeCount = prestigeCount;
+
+            // Save prestige upgrade levels (Using the standard UpgradeSaveData struct)
+            saveData.prestigeUpgradeLevels = new List<UpgradeSaveData>();
+            
+            if (playerPrestigeUpgradesState == null)
+            {
+                Debug.LogError("[PrestigeManager] playerPrestigeUpgradesState is null during save!");
+                EnsureUpgradeStatesInitialized(); // Try to recover by initializing
+                
+                if (playerPrestigeUpgradesState == null)
+                {
+                    return; // If still null, can't continue
+                }
+            }
+
+            // Save all upgrades with levels > 0
+            foreach (var kvp in playerPrestigeUpgradesState)
+            {
+                PrestigeUpgradeData data = kvp.Key;
+                UpgradeState state = kvp.Value;
+                
+                if (data != null && state.level > 0)
+                {
+                    saveData.prestigeUpgradeLevels.Add(new UpgradeSaveData
+                    {
+                        upgradeName = data.name, // Use object name as ID
+                        level = state.level
+                    });
+                }
+            }
+            
+            Debug.Log($"[PrestigeManager] Saved {saveData.prestigeUpgradeLevels.Count} prestige upgrade levels.");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[PrestigeManager] Exception during UpdateSaveData: {ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     private void ApplyAllLoadedPrestigeEffects()
@@ -490,46 +660,41 @@ public class PrestigeManager : MonoBehaviour
         // Debug.Log("PrestigeManager: Runtime data reset.");
     }
 
-    public void UpdateSaveData(SaveData saveData)
+    // Add these methods to get spawn time estimates without needing direct LemonManager reference
+    public (float minTime, float maxTime) GetEstimatedLemonSpawnTimes()
     {
-        if (saveData == null) return;
-
-        saveData.goldBars = goldBars.ToString(CultureInfo.InvariantCulture);
-        saveData.prestigeCount = prestigeCount;
-
-        // Save prestige upgrade levels (Using the standard UpgradeSaveData struct)
-        saveData.prestigeUpgradeLevels = new List<UpgradeSaveData>();
-        if (playerPrestigeUpgradesState != null)
+        // Base values from LemonManager
+        float baseMinSpawnTime = 30f; // Default from LemonManager
+        float baseMaxSpawnTime = 90f; // Default from LemonManager
+        
+        // Check if there's a spawn rate upgrade that overrides these values
+        var spawnRateUpgrade = availablePrestigeUpgradesData?.FirstOrDefault(
+            data => data != null && data.effectType == PrestigeEffectType.LemonSpawnRate);
+        
+        if (spawnRateUpgrade != null)
         {
-            foreach (var kvp in playerPrestigeUpgradesState)
-            {
-                PrestigeUpgradeData data = kvp.Key;
-                UpgradeState state = kvp.Value;
-                if (data != null && state.level > 0) // Only save if level > 0
-                {
-                    // Use the ScriptableObject's name as a unique identifier for saving
-                    saveData.prestigeUpgradeLevels.Add(new UpgradeSaveData
-                    {
-                        upgradeName = data.name, // Use SO name as ID (consistent with other managers)
-                        level = state.level
-                    });
-                }
-            }
-             Debug.Log($"[PrestigeManager] Saved {saveData.prestigeUpgradeLevels.Count} prestige upgrade levels.");
+            // Use overrides if specified
+            if (spawnRateUpgrade.baseValueOverride > 0)
+                baseMinSpawnTime = spawnRateUpgrade.baseValueOverride;
+                
+            // Max value could be specified in maxValueLimit
+            if (spawnRateUpgrade.maxValueLimit > 0)
+                baseMaxSpawnTime = spawnRateUpgrade.maxValueLimit;
         }
-         else {
-             Debug.LogWarning("[PrestigeManager] playerPrestigeUpgradesState is null during save.");
-         }
-    }
-
-    // Helper to find PrestigeUpgradeData by its name (used during load)
-    public PrestigeUpgradeData FindPrestigeUpgradeDataByName(string name)
-    {
-        // Ensure the available upgrades list is initialized
-        if (availablePrestigeUpgradesData == null) {
-            Debug.LogError("[PrestigeManager] availablePrestigeUpgradesData is null in FindPrestigeUpgradeDataByName!");
-            return null;
+        
+        // Get the total reduction from upgrades
+        float reduction = GetTotalLemonSpawnTimeReduction();
+        
+        // Apply reduction and enforce minimum values
+        float currentMinTime = Mathf.Max(10f, baseMinSpawnTime + reduction);
+        float currentMaxTime = Mathf.Max(30f, baseMaxSpawnTime + reduction);
+        
+        // Ensure min never exceeds max
+        if (currentMinTime > currentMaxTime)
+        {
+            currentMinTime = currentMaxTime - 1f;
         }
-        return availablePrestigeUpgradesData.FirstOrDefault(data => data != null && data.name == name);
+        
+        return (currentMinTime, currentMaxTime);
     }
 }

@@ -240,17 +240,42 @@ public class GameManager : MonoBehaviour
     }
 
     // --- Application Lifecycle Methods for Saving --- 
-    // Delegate saving to SaveLoadManager
+    // Improved handling for mobile app lifecycle
     void OnApplicationPause(bool pauseStatus)
     {
         if (pauseStatus)
         {
+            // App is pausing/going to background
+            Debug.Log("[GameManager] Application pausing - saving game state");
             saveLoadManager?.SaveGameData();
+        }
+        else
+        {
+            // App is resuming from pause
+            Debug.Log("[GameManager] Application resuming from pause");
+            
+            // Calculate offline progress since the pause
+            ApplyOfflineProduction();
+        }
+    }
+
+    void OnApplicationFocus(bool hasFocus)
+    {
+        // Only handle focus loss on mobile platforms
+        if (Application.isMobilePlatform)
+        {
+            if (!hasFocus)
+            {
+                // App is losing focus - save as a precaution on mobile
+                Debug.Log("[GameManager] Application losing focus on mobile - saving game state");
+                saveLoadManager?.SaveGameData();
+            }
         }
     }
 
     void OnApplicationQuit()
     {
+        Debug.Log("[GameManager] Application quitting - saving final game state");
         saveLoadManager?.SaveGameData();
     }
 

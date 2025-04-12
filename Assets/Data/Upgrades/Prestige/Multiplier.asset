@@ -14,9 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   upgradeName: Click Multiplier
   description: Multiply your clicks!
-  baseCostGoldBars: 1000
-  costScaleFactor: 5
+  baseCostGoldBars: 1200
+  costScaleFactor: 4
   effectType: 5
-  effectValuePerLevel: 1
+  effectValuePerLevel: 0.1
+  baseValueOverride: 0
+  maxValueLimit: 10
   isUniqueUnlock: 0
   requiredPrestigeLevel: 1

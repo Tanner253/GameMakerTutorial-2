@@ -17,6 +17,8 @@ MonoBehaviour:
   baseCostGoldBars: 1000
   costScaleFactor: 1.5
   effectType: 4
-  effectValuePerLevel: 1
+  effectValuePerLevel: 5
+  baseValueOverride: 15
+  maxValueLimit: 300
   isUniqueUnlock: 0
   requiredPrestigeLevel: 1

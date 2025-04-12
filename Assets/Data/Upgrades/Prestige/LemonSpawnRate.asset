@@ -18,5 +18,7 @@ MonoBehaviour:
   costScaleFactor: 10
   effectType: 2
   effectValuePerLevel: -5
+  baseValueOverride: 0
+  maxValueLimit: -45
   isUniqueUnlock: 0
   requiredPrestigeLevel: 1

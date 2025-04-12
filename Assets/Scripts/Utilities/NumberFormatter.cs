@@ -34,14 +34,46 @@ public static class NumberFormatter
         }
 
         // Note: The order of these checks matters (largest to smallest)
-        if (value >= GoldThreshold) formattedValue = $"{(value / SextillionThreshold):F2} G";
-        else if (value >= SextillionThreshold) formattedValue = $"{(value / SextillionThreshold):F2} Sx";
-        else if (value >= QuintillionThreshold) formattedValue = $"{(value / QuintillionThreshold):F2} Qt";
-        else if (value >= QuadrillionThreshold) formattedValue = $"{(value / QuadrillionThreshold):F2} Qd";
-        else if (value >= TrillionThreshold) formattedValue = $"{(value / TrillionThreshold):F2} T";
-        else if (value >= BillionThreshold) formattedValue = $"{(value / BillionThreshold):F2} B";
-        else if (value >= MillionThreshold) formattedValue = $"{(value / MillionThreshold):F2} M";
-        else if (value >= ThousandThreshold) formattedValue = $"{(value / ThousandThreshold):F2} K"; // Added K for consistency
+        if (value >= GoldThreshold) 
+        {
+            decimal result = value / SextillionThreshold;
+            formattedValue = FormatWithSuffix(result, "G");
+        }
+        else if (value >= SextillionThreshold) 
+        {
+            decimal result = value / SextillionThreshold;
+            formattedValue = FormatWithSuffix(result, "Sx");
+        }
+        else if (value >= QuintillionThreshold) 
+        {
+            decimal result = value / QuintillionThreshold;
+            formattedValue = FormatWithSuffix(result, "Qt");
+        }
+        else if (value >= QuadrillionThreshold) 
+        {
+            decimal result = value / QuadrillionThreshold;
+            formattedValue = FormatWithSuffix(result, "Qd");
+        }
+        else if (value >= TrillionThreshold) 
+        {
+            decimal result = value / TrillionThreshold;
+            formattedValue = FormatWithSuffix(result, "T");
+        }
+        else if (value >= BillionThreshold) 
+        {
+            decimal result = value / BillionThreshold;
+            formattedValue = FormatWithSuffix(result, "B");
+        }
+        else if (value >= MillionThreshold) 
+        {
+            decimal result = value / MillionThreshold;
+            formattedValue = FormatWithSuffix(result, "M");
+        }
+        else if (value >= ThousandThreshold) 
+        {
+            decimal result = value / ThousandThreshold;
+            formattedValue = FormatWithSuffix(result, "K");
+        }
         else
         {
             // For values less than 1000, decide precision
@@ -58,5 +90,31 @@ public static class NumberFormatter
         }
 
         return sign + formattedValue;
+    }
+
+    // Helper method to format a value with a suffix, removing decimal places if they're zeros
+    private static string FormatWithSuffix(decimal value, string suffix)
+    {
+        // Check if the value is a whole number or has decimal places
+        if (value == decimal.Truncate(value))
+        {
+            // It's a whole number, so format without decimals
+            return $"{decimal.Truncate(value)} {suffix}";
+        }
+        else
+        {
+            // Try with 1 decimal place first
+            string formatted = value.ToString("F1", CultureInfo.InvariantCulture);
+            
+            // Check if the last character is '0'
+            if (formatted.EndsWith("0"))
+            {
+                // No decimals needed, use the integer value
+                return $"{decimal.Truncate(value)} {suffix}";
+            }
+            
+            // Keep 1 decimal place
+            return $"{formatted} {suffix}";
+        }
     }
 } 
