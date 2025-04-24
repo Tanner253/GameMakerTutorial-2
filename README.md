@@ -91,5 +91,4 @@ For more detailed information about the project, please refer to the documentati
 ![Project Prompt](./documentation/prompt.jpg#gh-dark-mode-only)
 ![Project Prompt](./documentation/prompt.jpg#gh-light-mode-only)
 
-## Stats
-![GitHub Stats](https://github-readme-stats.vercel.app/api?username=Tanner253&show_icons=true&theme=radical) 
+
