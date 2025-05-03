@@ -48,7 +48,6 @@ git clone https://github.com/Tanner253/GameMakerTutorial-2.git
 
 ## Features
 - Cookie Clicker game mechanics
-- Custom MCP server integration
 - Real-time multiplayer support
 - Server-side game state management
 - Cross-platform compatibility
